@@ -13,7 +13,7 @@ Instant-play offline 3D vanguard survival & lane-defense game in a single ~1 MB 
 
 [中文](README.md) · [English](README_en.md)
 
-[Play](#play) · [Versions](#versions) · [Build from source](#build-from-source) · [Controls](#controls) · [Gameplay](#gameplay) · [Docs](#docs)
+[Play](#play) · [Versions](#versions) · [Build from source](#build-from-source) · [Controls](#controls) · [Gameplay](#gameplay) · [Directory](#directory) · [Prompts and Skills](#prompts-and-skills) · [Docs](#docs) · [Acknowledgements](#acknowledgements)
 
 </div>
 
@@ -36,7 +36,7 @@ The standalone build outputs a single self-contained HTML file under `tiny-vangu
   - Three-point warm/cool lighting + Fresnel rim shaders + 3.5-head Armored Vanguard + faceted 3D Rift Stalkers, Ravager Beasts, Void Constructs, War Golems, Shield Vanguards, and Dread Titan Bosses + `InstancedMesh` static scene batching.
 - **Dynamic Procedural Music & SFX**: Componentized Web Audio `MusicSequencer` & 3-bus `SoundEngine` that adapt themes and steady `82–114 BPM` grooves across Menu, Wild Survival, Bridge Defense, Boss encounters, and Combo Fever, with independent BGM/SFX toggles.
 - **Bilingual QA Debug Console**: Double-press `F9` within 3 seconds (or `?debug=1`) to toggle the live telemetry & QA console (`1x/2x/4x` speed, God Mode, level jump, all skills/20 relics, gate/formation triggers, Boss jump).
-- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 38 Vitest tests.
+- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 39 Vitest tests.
 
 ## Versions
 
@@ -72,7 +72,7 @@ npm run gate
 | `npm run dev` | Start Vite dev server |
 | `npm run check` | Run 5 prebuild gates (0 circular imports, security/offline, zero-GC hot loops, content quotas) |
 | `npm run type-check` | Run `vue-tsc --noEmit` |
-| `npm test` | Run 38 Vitest unit & headless simulation tests |
+| `npm test` | Run 39 Vitest unit & headless simulation tests |
 | `npm run build:single` | Build single-file HTML (`dist/`) and sync to `../docs/index.html` |
 | `npm run verify:single` | Verify zero external links, classic script compatibility, isolated copy, and size |
 | `npm run gate` | Run `check` → `type-check` → `test` → `build:single` → `verify:single` |
@@ -114,9 +114,72 @@ Defend the chevron barrier line, break or shoot-to-charge dual holographic laser
 
 <img src="./pic/bridge-defense-02-en.webp" alt="Bridge Defense Stage 2: Frost Bridge" width="960" />
 
+## Directory
+
+```text
+.
+├── pic/                     Bilingual screenshots and mobile gameplay demo
+├── prompts/                 Master engineering & gameplay specification prompt
+├── skills/                  Agent Skills for offline Web 3D & Three.js
+├── docments/                Architecture, gameplay, extending, and release docs
+├── docs/index.html          GitHub Pages copy synced with the latest build
+├── tiny-vanguard/
+│   ├── index.html           Development entry
+│   ├── package.json
+│   ├── scripts/             Prebuild gates, single-HTML finalizer & verifier
+│   ├── src/
+│   │   ├── assets/          App icon and UI logo
+│   │   ├── components/      Vue 3 HUD, menus, stage select, joystick & QA UI
+│   │   ├── config/          App metadata config
+│   │   └── game/
+│   │       ├── audio/       3-bus Web Audio SFX & dynamic MusicSequencer
+│   │       ├── config/      Quality tiers & runtime pool budgets
+│   │       ├── content/     Levels, skills, relics, buffs/debuffs & validator
+│   │       ├── core/        GameRuntime, GameClock, FSM & commands/events
+│   │       ├── debug/       Double-F9 QA debug bridge
+│   │       ├── i18n/        Bilingual EN/ZH dictionaries
+│   │       ├── input/       WASD + touch input buffer controller
+│   │       ├── pool/        Generation-safe snapshot ObjectPool
+│   │       ├── scene/       Three.js arena, hard-surface props & GLSL VFX
+│   │       ├── session/     GameSession, entity structs & SaveStorage
+│   │       ├── spatial/     Center-outward SpatialGrid
+│   │       ├── systems/     Movement, combat, waves, status, XP & upgrades
+│   │       └── __tests__/   39 Vitest unit & headless simulation tests
+│   └── dist/                tiny-vanguard-<version>-<timestamp>.html
+├── CHANGELOG.md
+├── LICENSE
+├── README.md
+└── README_en.md
+```
+
+## Prompts and Skills
+
+`prompts/` and `skills/` serve different purposes:
+
+- [tiny-vanguard-3d-horde-action-master-prompt.md](prompts/tiny-vanguard-3d-horde-action-master-prompt.md): Captures Tiny Vanguard's dual-mode combat design, zero-postprocessing GLSL VFX, hard-surface 3D modeling, procedural Web Audio, responsive controls, and 5 prebuild quality gates.
+- [skills/game-web3d-standalone-builder/](skills/game-web3d-standalone-builder/SKILL.md): A reusable Agent Skill for building modular TypeScript + Three.js games packed into a single offline HTML file (includes `SCENARIOS.md` and `scripts/audit-standalone-html.mjs`).
+- [skills/three-js/](skills/three-js/SKILL.md): General Three.js scene, shader, and rendering reference skill.
+
+Run the standalone offline audit from the repository root:
+
+```bash
+node skills/game-web3d-standalone-builder/scripts/audit-standalone-html.mjs
+```
+
 ## Docs
 
 - [Architecture](docments/ARCHITECTURE.md)
 - [Gameplay Design](docments/GAMEPLAY.md)
 - [Extending Content & Systems](docments/EXTENDING.md)
 - [Release & Acceptance](docments/RELEASE_AND_ACCEPTANCE.md)
+
+## Acknowledgements
+
+- [Three.js](https://threejs.org/)
+- [Vue 3](https://vuejs.org/)
+- [Vite](https://vite.dev/) & [vite-plugin-singlefile](https://github.com/richardtallent/vite-plugin-singlefile)
+- [Vitest](https://vitest.dev/)
+
+## License
+
+[MIT License](LICENSE)

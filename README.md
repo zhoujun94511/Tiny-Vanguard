@@ -13,7 +13,7 @@
 
 [中文](README.md) · [English](README_en.md)
 
-[开始玩](#开始玩) · [版本沿革](#版本沿革) · [从源码构建](#从源码构建) · [操作](#操作) · [玩法与内容](#玩法与内容) · [文档](#文档)
+[开始玩](#开始玩) · [版本沿革](#版本沿革) · [从源码构建](#从源码构建) · [操作](#操作) · [玩法与内容](#玩法与内容) · [目录](#目录) · [提示词与 Skill](#提示词与-skill) · [文档](#文档) · [致谢](#致谢)
 
 </div>
 
@@ -36,7 +36,7 @@
   - 三点冷暖布光 + 轻量 Fresnel 轮廓光 + 3.5 头身战甲先锋 + 立体非卡通怪物/重甲泰坦首领 + 静态场景 `InstancedMesh` 合批。
 - **组件化动态配乐与音效（BGM + SFX）**：纯 Web Audio 程序化音乐序列器与三总线音频引擎，按主菜单 / 荒野生存 / 通道守卫 / 首领战与连杀狂热以 `82–114 BPM` 稳态变奏，支持暂停页 BGM/SFX 独立开关及主菜单快捷静音。
 - **QA 调试控制台**：3 秒内连续按两次 `F9`（或 URL `?debug=1`）可呼出中英双语 QA 调试台，支持实时遥测、`1x/2x/4x` 倍速、无敌、跳关、全战技/全 20 遗物、刷光栅与直达首领战。
-- **工业级健壮性与门禁**：代际防重入 `ObjectPool`（支持并发迭代快照）、中心螺旋扩张 `SpatialGrid`、热循环零 GC、`npm run gate` 五道构建前校验 + 38 项 Vitest 单元测试。
+- **工业级健壮性与门禁**：代际防重入 `ObjectPool`（支持并发迭代快照）、中心螺旋扩张 `SpatialGrid`、热循环零 GC、`npm run gate` 五道构建前校验 + 39 项 Vitest 单元测试。
 
 ## 版本沿革
 
@@ -74,7 +74,7 @@ npm run gate
 | `npm run dev` | 启动 Vite 本地开发服务器 |
 | `npm run check` | 运行 5 道构建前门禁（0 循环依赖、安全离线红线、热循环零 GC、内容配额与解耦） |
 | `npm run type-check` | 运行 `vue-tsc --noEmit` 严格类型检查 |
-| `npm test` | 运行 Vitest 38 项单元测试与无头战斗全流程模拟 |
+| `npm test` | 运行 Vitest 39 项单元测试与无头战斗全流程模拟 |
 | `npm run build:single` | 打包带版本号与时间戳的单 HTML（输出至 `dist/` 并同步到 `../docs/index.html`） |
 | `npm run verify:single` | 校验最新单 HTML 的零外链、经典脚本兼容性、隔离目录运行及体积 |
 | `npm run gate` | 串联执行 `check` → `type-check` → `test` → `build:single` → `verify:single` |
@@ -116,9 +116,72 @@ npm run gate
 
 <img src="./pic/bridge-defense-02-zh.webp" alt="通道守卫第 2 关：霜雪栈桥" width="960" />
 
+## 目录
+
+```text
+.
+├── pic/                     中英文实机截图与移动端演示
+├── prompts/                 本项目完整工程与玩法提示词
+├── skills/                  离线 Web 3D 游戏与 Three.js Agent Skills
+├── docments/                架构、玩法、内容扩展与验收文档
+├── docs/index.html          与最新构建同步的 GitHub Pages 页面副本
+├── tiny-vanguard/
+│   ├── index.html           开发入口
+│   ├── package.json
+│   ├── scripts/             门禁校验、单文件后处理与离线纯度审计脚本
+│   ├── src/
+│   │   ├── assets/          应用图标与界面标志
+│   │   ├── components/      Vue 3 HUD、菜单、选关、摇杆与调试台
+│   │   ├── config/          应用元配置
+│   │   └── game/
+│   │       ├── audio/       Web Audio 三总线音效与动态程序化配乐
+│   │       ├── config/      画质档位与运行时预算配置
+│   │       ├── content/     关卡、战技、遗物、Buff/Debuff、升级与注册校验
+│   │       ├── core/        GameRuntime、双时钟 GameClock、状态机与指令事件
+│   │       ├── debug/       双击 F9 QA 调试桥
+│   │       ├── i18n/        中英双语文案字典
+│   │       ├── input/       WASD 与触屏输入缓冲控制器
+│   │       ├── pool/        防重入代际快照 ObjectPool
+│   │       ├── scene/       Three.js 场景、硬面模型、GLSL 特效与地形缓存
+│   │       ├── session/     GameSession、实体数据结构与 localStorage 存档
+│   │       ├── spatial/     中心螺旋扫描 SpatialGrid
+│   │       ├── systems/     移动、战斗、波次、状态效果、经验与升级系统
+│   │       └── __tests__/   39 项 Vitest 单元测试与无头战斗全流程模拟
+│   └── dist/                tiny-vanguard-<版本>-<时间>.html
+├── CHANGELOG.md
+├── LICENSE
+├── README.md
+└── README_en.md
+```
+
+## 提示词与 Skill
+
+`prompts/` 与 `skills/` 各自承担不同职责：
+
+- [tiny-vanguard-3d-horde-action-master-prompt.md](prompts/tiny-vanguard-3d-horde-action-master-prompt.md)：沉淀了《Tiny Vanguard》的双模式玩法、零后处理 GLSL 光效、硬面 3D 建模、动态 Web Audio、多端适配与五道工程门禁规范。
+- [skills/game-web3d-standalone-builder/](skills/game-web3d-standalone-builder/SKILL.md)：面向支持 Agent Skills 的编程助手，提供「模块化 TypeScript 源码 + 单文件离线 HTML」的通用构建与验收方法论（附 `SCENARIOS.md` 与 `scripts/audit-standalone-html.mjs`）。
+- [skills/three-js/](skills/three-js/SKILL.md)：Three.js 场景、着色器与渲染参考技能。
+
+可在仓库根目录单独执行离线产物审计：
+
+```bash
+node skills/game-web3d-standalone-builder/scripts/audit-standalone-html.mjs
+```
+
 ## 文档
 
 - [架构说明](docments/ARCHITECTURE.md)
 - [玩法设计](docments/GAMEPLAY.md)
 - [内容扩展指南](docments/EXTENDING.md)
 - [构建、验收与 Release 说明](docments/RELEASE_AND_ACCEPTANCE.md)
+
+## 致谢
+
+- [Three.js](https://threejs.org/)
+- [Vue 3](https://vuejs.org/)
+- [Vite](https://vite.dev/) & [vite-plugin-singlefile](https://github.com/richardtallent/vite-plugin-singlefile)
+- [Vitest](https://vitest.dev/)
+
+## 开源协议
+
+[MIT License](LICENSE)

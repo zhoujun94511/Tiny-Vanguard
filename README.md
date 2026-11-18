@@ -1,0 +1,124 @@
+<div align="center">
+
+<img src="./tiny-vanguard/src/assets/logo.png" alt="Tiny Vanguard" width="128" height="128" />
+
+# Tiny Vanguard
+
+双击即玩的 3D 战甲动作生存与防线守卫（1 MB 单文件离线版）
+
+[![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883.svg)](https://vuejs.org)
+[![Three.js](https://img.shields.io/badge/Three.js-r170-black.svg)](https://threejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6.svg)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6-646cff.svg)](https://vite.dev)
+
+[中文](README.md) · [English](README_en.md)
+
+[开始玩](#开始玩) · [版本沿革](#版本沿革) · [从源码构建](#从源码构建) · [操作](#操作) · [玩法与内容](#玩法与内容) · [文档](#文档)
+
+</div>
+
+操纵硬甲战甲先锋「星辉先锋」，在 **荒野生存** 与 **通道守卫** 两大核心模式中迎战高密度立体敌潮：一边通过走位、三大主动技（冲刺 / 圣盾 / 星爆）与三选一构筑引爆割草爽感，一边击破增益光栅、净化红框污染门、触发五对「超武共鸣觉醒」并斩杀终局重甲泰坦首领。
+
+项目构建产出是 `tiny-vanguard/dist/` 下的单个自包含 HTML 文件（同步至 `docs/index.html` 用于 GitHub Pages），双击（`file://`）或静态托管即可在浏览器中完全离线运行，零外部脚本、贴图、字体或音频请求。支持桌面端、平板及手机横竖屏与异形屏安全区适配。
+
+<img src="./pic/main-menu-zh.webp" alt="Tiny Vanguard 中文主界面" width="960" />
+
+## 核心特性
+
+- **两大核心玩法 + 分页关卡序列**：
+  - **荒野生存（Wild Survival）**：`翠风草甸`、`熔岩峡谷`（42° 3D 动作斜视角，最低在场怪数保底 + 环形合围/侧翼奔袭/精英护卫阵型波 + 限时全息空投补给）。
+  - **通道守卫（Bridge Defense）**：`木桥防线`、`霜雪栈桥`（狭路防线狙击 + 双路无框全息激光光栅：击破增益门 & 射击升阶/红框污染净化光栅 + 重盾先锋阵列）。
+- **5 大核心战技 × 20 遗物 × 超武共鸣觉醒**：
+  - 战技：`星辉连弹`（最近/防线优先）、`守护星环`（近身光刃护体）、`寒霜震荡波`（范围减速控制）、`雷鸣链刃`（专劈最密集怪堆质心）、`星轨重狙`（专点高血精英与首领）。
+  - 内容规模：**20 种 Debuff**、**22 种通道增益**、**20 件遗物装备**、**28 项升级**，支持 5 对战技×遗物「超武共鸣觉醒」与 25/60/120 连杀狂热（每百斩触发全图磁吸圣爆）。
+- **零后处理高燃 GLSL 光效与 3D 战甲重塑**：
+  - 采用 **Additive Fake Bloom + 单 Pass GLSL Shader**（激波噪波环、旋转能量光轨、天降星陨全息光柱、动态折线闪电链、穿透激光束、冲刺残影），零重型后处理，稳帧 60 FPS；
+  - 三点冷暖布光 + 轻量 Fresnel 轮廓光 + 3.5 头身战甲先锋 + 立体非卡通怪物/重甲泰坦首领 + 静态场景 `InstancedMesh` 合批。
+- **组件化动态配乐与音效（BGM + SFX）**：纯 Web Audio 程序化音乐序列器与三总线音频引擎，按主菜单 / 荒野生存 / 通道守卫 / 首领战与连杀狂热以 `82–114 BPM` 稳态变奏，支持暂停页 BGM/SFX 独立开关及主菜单快捷静音。
+- **QA 调试控制台**：3 秒内连续按两次 `F9`（或 URL `?debug=1`）可呼出中英双语 QA 调试台，支持实时遥测、`1x/2x/4x` 倍速、无敌、跳关、全战技/全 20 遗物、刷光栅与直达首领战。
+- **工业级健壮性与门禁**：代际防重入 `ObjectPool`（支持并发迭代快照）、中心螺旋扩张 `SpatialGrid`、热循环零 GC、`npm run gate` 五道构建前校验 + 38 项 Vitest 单元测试。
+
+## 版本沿革
+
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+| 版本 | 日期 | 内容 |
+| --- | --- | --- |
+| 1.0.0（全面重塑） | 2026-11-18 | 升级 2 大核心玩法 4 关分页序列、5 大战技、20 Debuff / 22 Buff / 20 遗物 / 28 升级、Wave Director、充能与红门净化光栅、动态程序化 BGM/SFX、双击 `F9` QA 调试台、全端屏幕适配、右下角 3 槽弧形技能轮盘（`Space`/`E`/`Q`）、P0/P1 竞态与 `InstancedMesh` 合批优化，以及 3D 战甲与零开销 GLSL 光效重塑（单 HTML 约 `1.017 MiB`）。 |
+| 1.0.0（初版） | 2026-11-17 | 首次可玩版本。Vue 3 + TypeScript + Three.js 核心架构与单 HTML 离线打包（约 `0.653 MiB`）。 |
+
+## 开始玩
+
+用浏览器打开仓库里的单文件构建产物：
+
+```text
+tiny-vanguard/dist/tiny-vanguard-<版本>-<YYYYMMDD-HHmmss>.html
+```
+
+也可以直接打开或通过 GitHub Pages 访问已同步的 `docs/index.html`。版本来自 `tiny-vanguard/package.json` 的 `version`，构建时间戳记录在文件头注释及 `<meta>` 标签内，每次构建只保留最新一份。
+
+最佳成绩与画质/BGM/SFX/语言设置保存在 `localStorage` 中；若环境禁止本地存储，自动退回内存会话模式。
+
+## 从源码构建
+
+在 `tiny-vanguard/` 目录执行，需要 Node.js 18 及以上（推荐 Node 22）。Windows PowerShell 5.1 请逐条执行命令：
+
+```powershell
+cd tiny-vanguard
+npm install
+npm run gate
+```
+
+| 脚本 | 作用 |
+| --- | --- |
+| `npm run dev` | 启动 Vite 本地开发服务器 |
+| `npm run check` | 运行 5 道构建前门禁（0 循环依赖、安全离线红线、热循环零 GC、内容配额与解耦） |
+| `npm run type-check` | 运行 `vue-tsc --noEmit` 严格类型检查 |
+| `npm test` | 运行 Vitest 38 项单元测试与无头战斗全流程模拟 |
+| `npm run build:single` | 打包带版本号与时间戳的单 HTML（输出至 `dist/` 并同步到 `../docs/index.html`） |
+| `npm run verify:single` | 校验最新单 HTML 的零外链、经典脚本兼容性、隔离目录运行及体积 |
+| `npm run gate` | 串联执行 `check` → `type-check` → `test` → `build:single` → `verify:single` |
+
+## 操作
+
+| 输入 | 作用 |
+| --- | --- |
+| `WASD` | 移动（自动索敌与多战技协同攻击） |
+| `Space` / 右下角「冲刺」 | 战术冲刺（带短瞬无敌帧与离子残影） |
+| `E` / 右下角「圣盾」 | 圣盾护体（获得护盾、短瞬无敌并击退减速周围敌人） |
+| `Q` / 右下角「星爆」 | 充能满释放「星爆大招」（天降星陨光柱 + 全屏清场） |
+| `1` / `2` / `3` 或点击卡片 | 升级弹窗三选一 |
+| 左下角虚拟摇杆（触屏自动显示） | `pointerId` 隔离无极方向移动 |
+| 右上角 `⏸` 按钮 | 暂停、画质切换（省电 / 均衡 / 高清）、BGM/SFX 独立开关与中英切换 |
+| `F9` × 2（3 秒内双击） | 开关中英双语 QA 调试控制台 |
+
+**移动端触控与弧形技能轮盘实机演示：**
+
+<div align="center">
+<img src="./pic/mobile-gameplay.webp" alt="Tiny Vanguard 移动端触控与弧形技能轮盘演示" width="300" />
+</div>
+
+## 玩法与内容
+
+### 荒野生存（翠风草甸 / 熔岩峡谷）
+
+4.5～6 分钟四阶段递进割草——前期蓄势发育 → 中期敌潮与阵型事件波 → 后期满屏割草狂欢 + 击杀精英/空投补给直穿遗物 → 终局重甲泰坦首领战。
+
+<img src="./pic/wild-survival-01-zh.webp" alt="荒野生存第 1 关：翠风草甸" width="960" />
+
+<img src="./pic/wild-survival-02-zh.webp" alt="荒野生存第 2 关：熔岩峡谷" width="960" />
+
+### 通道守卫（木桥防线 / 霜雪栈桥）
+
+扼守桥尾红线，击破或射击充能双路全息光栅（左路击破即时增益，右路射击升阶 Lv.1→Lv.3 或净化红框污染门翻倍收益），击杀直接装配战技与遗物，迎战重盾先锋阵与终局首领。
+
+<img src="./pic/bridge-defense-01-zh.webp" alt="通道守卫第 1 关：木桥防线" width="960" />
+
+<img src="./pic/bridge-defense-02-zh.webp" alt="通道守卫第 2 关：霜雪栈桥" width="960" />
+
+## 文档
+
+- [架构说明](docments/ARCHITECTURE.md)
+- [玩法设计](docments/GAMEPLAY.md)
+- [内容扩展指南](docments/EXTENDING.md)
+- [构建、验收与 Release 说明](docments/RELEASE_AND_ACCEPTANCE.md)

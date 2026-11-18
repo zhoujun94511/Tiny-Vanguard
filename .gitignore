@@ -1,0 +1,20 @@
+# 依赖与本机缓存（提交前必须排除）
+node_modules/
+.vite/
+coverage/
+
+# IDE
+.idea/
+*.iml
+
+# 中间构建目录。版本化单文件 dist/*.html 与 docs/index.html 是交付物，需要保留。
+tiny-vanguard/dist-web/
+tiny-vanguard/dist-single/
+
+# 临时文件与系统垃圾
+*.log
+*.tmp
+*.tmp-*
+.DS_Store
+Thumbs.db
+Desktop.ini

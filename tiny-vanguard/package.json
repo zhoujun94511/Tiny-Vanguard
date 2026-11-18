@@ -1,0 +1,31 @@
+{
+  "name": "tiny-vanguard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiny Vanguard — Cute 3D Auto-Battle Survival Game built with Vue 3, TypeScript, Vite, and Three.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "node scripts/prebuild-check.mjs",
+    "type-check": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "build:single": "vite build --config vite.single.config.ts && node scripts/finalize-single.mjs",
+    "verify:single": "node scripts/verify-single.mjs",
+    "gate": "npm run check && npm run type-check && npm test && npm run build:single && npm run verify:single"
+  },
+  "dependencies": {
+    "three": "^0.170.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.11",
+    "vite-plugin-singlefile": "^2.0.3",
+    "vitest": "^2.1.8",
+    "vue-tsc": "^2.2.0"
+  }
+}

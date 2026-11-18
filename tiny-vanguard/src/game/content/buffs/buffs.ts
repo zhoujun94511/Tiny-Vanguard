@@ -1,0 +1,26 @@
+import type { BuffDefinition } from '../definitions/ContentTypes';
+
+export const BUFF_DEFS: readonly BuffDefinition[] = [
+  { id: 'buff-dmg-25', name: '勇者战吼', nameEn: 'War Cry', shortLabel: '+25% 伤害', shortLabelEn: '+25% DMG', effects: [{ kind: 'player-damage-pct', value: 0.25 }] },
+  { id: 'buff-dmg-40', name: '狂暴之力', nameEn: 'Berserk', shortLabel: '+40% 伤害', shortLabelEn: '+40% DMG', effects: [{ kind: 'player-damage-pct', value: 0.4 }] },
+  { id: 'buff-rate-20', name: '疾风连射', nameEn: 'Rapid Fire', shortLabel: '+20% 攻速', shortLabelEn: '+20% SPD', effects: [{ kind: 'player-attack-speed-pct', value: 0.2 }] },
+  { id: 'buff-rate-30', name: '超频节奏', nameEn: 'Overclock', shortLabel: '+30% 攻速', shortLabelEn: '+30% SPD', effects: [{ kind: 'player-attack-speed-pct', value: 0.3 }] },
+  { id: 'buff-multishot-1', name: '双子星弹', nameEn: 'Twin Bolts', shortLabel: '+1 弹丸', shortLabelEn: '+1 Bolt', effects: [{ kind: 'weapon-count-add', value: 1, weaponId: 'star-blaster' }] },
+  { id: 'buff-pierce-1', name: '贯穿星矢', nameEn: 'Piercing', shortLabel: '+1 穿透', shortLabelEn: '+1 Pierce', effects: [{ kind: 'weapon-pierce-add', value: 1, weaponId: 'star-blaster' }] },
+  { id: 'buff-crit-15', name: '致命直觉', nameEn: 'Lethal Aim', shortLabel: '+15% 暴击', shortLabelEn: '+15% Crit', effects: [{ kind: 'player-crit-add', value: 0.15 }] },
+  { id: 'buff-crit-dmg-35', name: '会心重击', nameEn: 'Heavy Crit', shortLabel: '+35% 暴伤', shortLabelEn: '+35% CritDMG', effects: [{ kind: 'player-crit-dmg-add', value: 0.35 }] },
+  { id: 'buff-move-15', name: '轻风步伐', nameEn: 'Wind Step', shortLabel: '+15% 移速', shortLabelEn: '+15% Move', effects: [{ kind: 'player-move-speed-pct', value: 0.15 }] },
+  { id: 'buff-heal-35', name: '圣泉甘露', nameEn: 'Spring Dew', shortLabel: '生命 +35', shortLabelEn: '+35 HP', effects: [{ kind: 'player-heal-pct', value: 0.3 }] },
+  { id: 'buff-maxhp-30', name: '泰坦祝福', nameEn: 'Titan Vigor', shortLabel: '+30 上限', shortLabelEn: '+30 MaxHP', effects: [{ kind: 'player-max-hp-add', value: 30 }] },
+  { id: 'buff-shield-25', name: '圣盾守护', nameEn: 'Aegis Ward', shortLabel: '+25 护盾', shortLabelEn: '+25 Shield', effects: [{ kind: 'player-shield-add', value: 25 }] },
+  { id: 'buff-vampiric', name: '嗜血战意', nameEn: 'Life Leech', shortLabel: '击杀 +2% 生命', shortLabelEn: '+2% HP/Kill', effects: [{ kind: 'player-life-on-kill-add', value: 0.02 }] },
+  { id: 'buff-fury-gain', name: '星怒涌动', nameEn: 'Fury Surge', shortLabel: '+35% 充能', shortLabelEn: '+35% Fury', effects: [{ kind: 'player-fury-gain-pct', value: 0.35 }] },
+  { id: 'buff-dash-cd', name: '幻影闪避', nameEn: 'Phantom Dash', shortLabel: '-25% 冲刺CD', shortLabelEn: '-25% DashCD', effects: [{ kind: 'player-dash-cd-pct', value: 0.25 }] },
+  { id: 'buff-frost-imbue', name: '极寒附魔', nameEn: 'Frost Imbue', shortLabel: '冰霜减速弹', shortLabelEn: 'Frost Hit', effects: [{ kind: 'player-imbue-debuff', value: 1, debuffId: 'frost-chill' }] },
+  { id: 'buff-fire-imbue', name: '烈焰附魔', nameEn: 'Fire Imbue', shortLabel: '烈焰灼烧弹', shortLabelEn: 'Fire Hit', effects: [{ kind: 'player-imbue-debuff', value: 1, debuffId: 'hellfire-burn' }] },
+  { id: 'buff-poison-imbue', name: '剧毒附魔', nameEn: 'Venom Imbue', shortLabel: '剧毒扩散弹', shortLabelEn: 'Plague Hit', effects: [{ kind: 'player-imbue-debuff', value: 1, debuffId: 'plague-spread' }] },
+  { id: 'buff-shock-imbue', name: '雷霆附魔', nameEn: 'Shock Imbue', shortLabel: '感电高压弹', shortLabelEn: 'Shock Hit', effects: [{ kind: 'player-imbue-debuff', value: 1, debuffId: 'shock-static' }] },
+  { id: 'buff-shred-imbue', name: '破甲附魔', nameEn: 'Sunder Imbue', shortLabel: '碎甲易伤弹', shortLabelEn: 'Sunder Hit', effects: [{ kind: 'player-imbue-debuff', value: 1, debuffId: 'heavy-sunder' }] },
+  { id: 'buff-orbit-add', name: '星环护卫', nameEn: 'Orbit Guard', shortLabel: '解锁/强化星环', shortLabelEn: 'Orbit +1', effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'orbit-shields' }] },
+  { id: 'buff-thunder-add', name: '雷鸣链刃', nameEn: 'Thunder Arc', shortLabel: '解锁电弧', shortLabelEn: 'Thunder Arc', effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'thunder-arc' }] },
+];

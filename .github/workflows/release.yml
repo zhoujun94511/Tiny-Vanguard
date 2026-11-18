@@ -1,0 +1,59 @@
+name: Build & Release Tiny Vanguard
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tiny-vanguard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tiny-vanguard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Git tag matches package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VER="${GITHUB_REF_NAME#v}"
+          PKG_VER=$(node -p "require('./package.json').version")
+          if [ "$TAG_VER" != "$PKG_VER" ]; then
+            echo "Tag version ($TAG_VER) does not match package.json version ($PKG_VER)"
+            exit 1
+          fi
+
+      - name: Run full quality & build gate
+        run: npm run gate
+
+      - name: Generate SHA-256 checksum
+        run: |
+          cd dist
+          ARTIFACT=$(ls -1 tiny-vanguard-*.html | head -n 1)
+          sha256sum "$ARTIFACT" > "${ARTIFACT}.sha256"
+          cat "${ARTIFACT}.sha256"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiny-vanguard-single-html
+          path: |
+            tiny-vanguard/dist/tiny-vanguard-*.html
+            tiny-vanguard/dist/tiny-vanguard-*.html.sha256
+          if-no-files-found: error

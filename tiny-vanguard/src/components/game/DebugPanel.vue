@@ -188,6 +188,14 @@ function runAndRefresh(fn: () => unknown) {
             <button type="button" class="dbg-btn warn" @click="runAndRefresh(() => bridge.jumpToBoss())">
               {{ t('debug.jumpBoss') }}
             </button>
+            <button
+              type="button"
+              class="dbg-btn warn"
+              :disabled="!telemetry.canInstantClear"
+              @click="runAndRefresh(() => bridge.instantClear())"
+            >
+              {{ t('debug.instantClear') }}
+            </button>
             <button type="button" class="dbg-btn" @click="runAndRefresh(() => bridge.clearNormalEnemies())">
               {{ t('debug.clearMobs') }}
             </button>

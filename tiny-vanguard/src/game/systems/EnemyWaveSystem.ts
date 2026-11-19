@@ -530,10 +530,12 @@ export class EnemyWaveSystem {
     enemy.vz = 0;
     enemy.kbVx = 0;
     enemy.kbVz = 0;
-    enemy.maxHp = Math.round(def.maxHp * hpMult);
+    const safeHp = Math.round(def.maxHp * hpMult);
+    enemy.maxHp = Number.isFinite(safeHp) ? Math.max(1, Math.min(1_000_000_000, safeHp)) : 1_000_000_000;
     enemy.hp = enemy.maxHp;
     enemy.speed = def.speed * speedMult;
-    enemy.damage = Math.round(def.damage * dmgMult);
+    const safeDmg = Math.round(def.damage * dmgMult);
+    enemy.damage = Number.isFinite(safeDmg) ? Math.max(1, Math.min(100_000, safeDmg)) : 100_000;
     enemy.radius = def.radius;
     enemy.xpValue = def.xpValue;
     enemy.baseColor = def.color;

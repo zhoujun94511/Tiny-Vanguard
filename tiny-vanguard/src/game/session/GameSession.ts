@@ -120,6 +120,10 @@ export class GameSession {
     this.enemyGrid = new SpatialGrid(level.arenaRadius + 16, 2.5, caps.enemies);
 
     const startWeapon = this.createWeaponState(this.character.startingWeaponId);
+    const startingWeapons = [startWeapon];
+    if (level.arenaShape === 'bridge' && this.character.startingWeaponId !== 'star-blaster') {
+      startingWeapons.push(this.createWeaponState('star-blaster'));
+    }
     const baseXp = this.computeXpToNext(1);
 
     this.player = {
@@ -160,7 +164,7 @@ export class GameSession {
       xpToNext: baseXp,
       level: 1,
       kills: 0,
-      weapons: [startWeapon],
+      weapons: startingWeapons,
       upgradeLevels: new Map(),
       equippedRelics: [],
       directModifiers: {
@@ -249,8 +253,11 @@ export class GameSession {
   }
 
   public computeXpToNext(level: number): number {
+    const safeLv = Math.max(1, Math.min(500, Math.floor(level)));
     const { base, growth, exponent } = this.level.xpCurve;
-    return Math.round(base * Math.pow(growth, Math.pow(level - 1, exponent)));
+    const raw = base * Math.pow(growth, Math.pow(safeLv - 1, exponent));
+    if (!Number.isFinite(raw)) return 1_000_000_000;
+    return Math.max(10, Math.min(1_000_000_000, Math.round(raw)));
   }
 
   public spawnVfxBurst(x: number, y: number, z: number, color: number, count = 5): void {

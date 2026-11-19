@@ -26,8 +26,8 @@ The standalone build outputs a single self-contained HTML file under `tiny-vangu
 ## Features
 
 - **Two Core Modes × 8 Progressive Stages + Endless Abyss**:
-  - **Wild Survival**: `Verdant Meadow`, `Ember Canyon`, `Shadow Ruins`, `Astral Throne` (42° 3D action camera, minimum active-enemy floor Wave Director, formation waves, timed Supply Drop Pods, and **Endless Abyss** after Stage 4 Boss with Limit Break scaling and periodic extraction).
-  - **Bridge Defense**: `Bridge Defense`, `Frost Bridge`, `Iron Viaduct`, `Abyss Span` (`4.8m` visible tactical defense bay + dual shoot-to-charge/purify holographic laser gates with 1-of-2 walk-through claim + armored Shield Vanguard phalanxes + **Endless Abyss** after Stage 4 Boss with Limit Break scaling).
+  - **Wild Survival**: `Verdant Meadow`, `Ember Canyon`, `Shadow Ruins`, `Astral Throne` (42° 3D action camera, minimum active-enemy floor Wave Director, formation waves, timed Supply Drop Pods; clearing Stage 4 permanently unlocks a **`♾️ Endless`** direct-entry button on the stage card with Limit Break scaling and periodic extraction).
+  - **Bridge Defense**: `Bridge Defense`, `Frost Bridge`, `Iron Viaduct`, `Abyss Span` (`4.8m` visible tactical defense bay + dual shoot-to-charge/purify holographic laser gates with 1-of-2 walk-through claim + armored Shield Vanguard phalanxes; clearing Stage 4 likewise unlocks a **`♾️ Endless`** direct-entry button, and all heroes start with a ranged `star-blaster` sidearm for gate charging).
 - **Diablo-Style 3-Stage Meta-Progression Loop (4-Tab Armory)**:
   - **Heroes & Star Progression (1★→5★)**: `Star Vanguard`, `Storm Ranger`, and `Iron Bastion` unlock via shards or Star Medals (legacy victory saves auto-unlock all), scaling HP, damage, and signature passives.
   - **8 Armory Talents**: Includes `Fate Dice` (+1 starting reroll/rank) and `Regicide Edge` (+8% Elite/Boss DMG/rank).
@@ -40,7 +40,7 @@ The standalone build outputs a single self-contained HTML file under `tiny-vangu
   - Three-point warm/cool lighting + Fresnel rim shaders + 3.5-head Armored Vanguard + faceted 3D Rift Stalkers, Ravager Beasts, Void Constructs, War Golems, Shield Vanguards, and Dread Titan Bosses + `InstancedMesh` static scene batching.
 - **Dynamic Procedural Music & SFX**: Componentized Web Audio `MusicSequencer` & 3-bus `SoundEngine` that adapt themes and steady `82–114 BPM` grooves across Menu, Wild Survival, Bridge Defense, Boss encounters, and Combo Fever, with independent BGM/SFX toggles.
 - **Bilingual QA Debug Console**: Double-press `F9` within 3 seconds (or `?debug=1`) to toggle the live telemetry & QA console (`1x/2x/4x` speed, God Mode, level jump, all skills/20 relics, gate/formation triggers, Boss jump).
-- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 59 Vitest tests.
+- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 63 Vitest tests.
 
 ## Versions
 
@@ -76,7 +76,7 @@ npm run gate
 | `npm run dev` | Start Vite dev server |
 | `npm run check` | Run 5 prebuild gates (0 circular imports, security/offline, zero-GC hot loops, content quotas) |
 | `npm run type-check` | Run `vue-tsc --noEmit` |
-| `npm test` | Run 59 Vitest unit & headless simulation tests |
+| `npm test` | Run 63 Vitest unit & headless simulation tests |
 | `npm run build:single` | Build single-file HTML (`dist/`) and sync to `../docs/index.html` |
 | `npm run verify:single` | Verify zero external links, classic script compatibility, isolated copy, and size |
 | `npm run gate` | Run `check` → `type-check` → `test` → `build:single` → `verify:single` |

@@ -123,7 +123,7 @@ onUnmounted(() => {
         {{ t('res.nextStage', { name: tc(result.nextLevelId, 'name', result.nextLevelName ?? '') }) }}
       </button>
       <button
-        v-if="result.victory && !result.isEndless"
+        v-if="result.victory && !result.isEndless && !result.nextLevelId"
         class="btn-ghost"
         type="button"
         @click="emit('enterEndless')"

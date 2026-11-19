@@ -1,6 +1,6 @@
 {
   "name": "tiny-vanguard",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Tiny Vanguard — Cute 3D Auto-Battle Survival Game built with Vue 3, TypeScript, Vite, and Three.js",
   "type": "module",

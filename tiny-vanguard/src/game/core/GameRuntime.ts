@@ -623,7 +623,7 @@ export class GameRuntime {
     }
   }
 
-  public loadLevel(levelId: string): boolean {
+  public loadLevel(levelId: string, startEndless = false): boolean {
     const level = this.registries.levels.get(levelId);
     if (!level) {
       this.events.emit('error', { message: `关卡 "${levelId}" 不存在`, fatal: false });
@@ -664,6 +664,28 @@ export class GameRuntime {
       this.saveData.relicSockets,
       this.saveData.relicEnchants
     );
+    if (startEndless) {
+      this.session.endlessMode = true;
+      this.session.endlessStartedAtSec = 0;
+      this.session.endlessWaveLevel = 1;
+      this.session.endlessBossTimer = 50;
+      this.session.player.level = 5;
+      this.session.player.xpToNext = this.session.computeXpToNext(5);
+      this.session.player.directModifiers.damageBonus += 0.25;
+      this.session.player.directModifiers.maxHpBonus += 40;
+      if (level.arenaShape === 'bridge') {
+        for (const wid of level.allowedWeaponIds) {
+          if (this.session.player.weapons.length >= Math.min(3, level.weaponSlotCount)) break;
+          if (!this.session.player.weapons.some((w) => w.weaponId === wid)) {
+            this.session.player.weapons.push(this.session.createWeaponState(wid));
+          }
+        }
+      } else {
+        this.session.pendingLevelUps = 3;
+      }
+      this.upgradeSys.recalculateStats(this.session);
+      this.session.player.hp = this.session.player.maxHp;
+    }
     if (level.arenaShape === 'bridge') {
       this.session.player.facingRad = Math.PI;
     }
@@ -736,7 +758,7 @@ export class GameRuntime {
 
   public enterEndlessMode(): boolean {
     const s = this.session;
-    if (!s || !this.fsm.enterEndlessFromVictory()) return false;
+    if (!s || (s.level.stageOrder ?? 0) < 4 || !this.fsm.enterEndlessFromVictory()) return false;
     s.endlessMode = true;
     s.endlessStartedAtSec = s.elapsedSec;
     s.endlessWaveLevel = 1;
@@ -1524,6 +1546,15 @@ export class GameRuntime {
       godMode: this.debugGodMode,
       timeScale: this.debugTimeScale,
       bossActive: Boolean(s && s.bossSpawned && !s.bossKilled),
+      isEndless: Boolean(s?.endlessMode),
+      canInstantClear: Boolean(
+        s &&
+          !s.endlessMode &&
+          !this.fsm.isTerminal() &&
+          s.level.visibleInMenu &&
+          (s.level.stageOrder ?? 0) >= 1 &&
+          (s.level.stageOrder ?? 0) <= 4
+      ),
     };
   }
 
@@ -1683,6 +1714,16 @@ export class GameRuntime {
     this.syncVisualsNow(0);
     this.emitStateAndHud();
     return cleared;
+  }
+
+  public debugInstantClear(): boolean {
+    const s = this.session;
+    if (!s || s.endlessMode || this.fsm.isTerminal()) return false;
+    if (!s.level.visibleInMenu) return false;
+    const order = s.level.stageOrder ?? 0;
+    if (order < 1 || order > 4) return false;
+    this.finishRun(s, true, `QA 快速通关 ${s.level.name}`);
+    return true;
   }
 
   public destroy(): void {

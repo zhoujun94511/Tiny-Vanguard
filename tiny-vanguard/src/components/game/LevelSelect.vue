@@ -6,7 +6,7 @@ import type {
   GameModeKey,
   LevelDefinition,
 } from '../../game/content/definitions/ContentTypes';
-import { getRelicIcon } from '../../game/content/icons/itemIcons';
+import { getRelicIcon, getWeaponZhName } from '../../game/content/icons/itemIcons';
 import {
   CHALLENGE_MODIFIERS,
   type ChallengeModifierId,
@@ -33,6 +33,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select', levelId: string): void;
+  (e: 'selectEndless', levelId: string): void;
   (e: 'selectCharacter', characterId: string): void;
   (e: 'toggleModifier', modifierId: ChallengeModifierId): void;
   (e: 'back'): void;
@@ -145,6 +146,10 @@ function isLevelUnlocked(id: string): boolean {
   return props.unlockedLevelIds ? Boolean(props.unlockedLevelIds[id]) : true;
 }
 
+function canDirectEndless(lvl: LevelDefinition): boolean {
+  return (lvl.stageOrder ?? 0) >= 4 && (props.saveData.bestVictorySecByLevel[lvl.id] ?? 0) > 0;
+}
+
 const selectedHero = computed(
   () =>
     props.characters.find((c) => c.id === props.saveData.selectedCharacterId) ??
@@ -209,7 +214,7 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
               <span v-else class="hero-star-tag"> ★{{ getHeroStars(ch.id) }}</span>
             </strong>
             <span class="hero-meta">
-              {{ tc(ch.startingWeaponId, 'name', ch.startingWeaponId) }} · ❤️{{ ch.baseHp }}
+              {{ tc(ch.startingWeaponId, 'name', getWeaponZhName(ch.startingWeaponId)) }} · ❤️{{ ch.baseHp }}
             </span>
           </span>
         </button>
@@ -245,10 +250,11 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
       </div>
 
       <div class="stage-list">
-        <button
+        <div
           v-for="(lvl, localIdx) in pagedItems"
           :key="lvl.id"
-          type="button"
+          role="button"
+          :tabindex="isLevelUnlocked(lvl.id) ? 0 : -1"
           class="stage-card"
           :class="[
             getStageTheme(lvl),
@@ -257,8 +263,9 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
               locked: !isLevelUnlocked(lvl.id),
             },
           ]"
-          :disabled="!isLevelUnlocked(lvl.id)"
-          @click="emit('select', lvl.id)"
+          :aria-disabled="!isLevelUnlocked(lvl.id)"
+          @click="isLevelUnlocked(lvl.id) && emit('select', lvl.id)"
+          @keydown.enter="isLevelUnlocked(lvl.id) && emit('select', lvl.id)"
         >
           <div class="card-accent"></div>
 
@@ -290,13 +297,31 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
               <span v-if="saveData.bestVictorySecByLevel[lvl.id]" class="meta-item">
                 {{ t('levels.bestWin') }}: <strong>{{ formatRecord(saveData.bestVictorySecByLevel[lvl.id]) }}</strong>
               </span>
+              <span v-if="(saveData.bestEndlessSecByLevel[lvl.id] ?? 0) > 0" class="meta-item">
+                {{ t('levels.bestEndless') }}: <strong>{{ formatRecord(saveData.bestEndlessSecByLevel[lvl.id]) }}</strong>
+              </span>
             </div>
           </div>
 
           <div class="stage-action-col">
-            <span class="deploy-btn">{{ isLevelUnlocked(lvl.id) ? t('levels.deploy') : '🔒' }}</span>
+            <button
+              type="button"
+              class="deploy-btn"
+              :disabled="!isLevelUnlocked(lvl.id)"
+              @click.stop="emit('select', lvl.id)"
+            >
+              {{ isLevelUnlocked(lvl.id) ? t('levels.deploy') : '🔒' }}
+            </button>
+            <button
+              v-if="canDirectEndless(lvl)"
+              type="button"
+              class="deploy-btn endless-btn"
+              @click.stop="emit('selectEndless', lvl.id)"
+            >
+              {{ t('levels.directEndless') }}
+            </button>
           </div>
-        </button>
+        </div>
       </div>
 
       <PaginationBar
@@ -704,17 +729,28 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
 }
 .stage-action-col {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 .deploy-btn {
   min-width: 96px;
   text-align: center;
   padding: 8px 16px;
+  border: none;
   border-radius: 10px;
   background: linear-gradient(135deg, #ffd166, #f4a261);
   color: #1e293b;
   font-size: 13px;
   font-weight: 800;
+  cursor: pointer;
+}
+.deploy-btn:disabled {
+  cursor: not-allowed;
+}
+.deploy-btn.endless-btn {
+  background: linear-gradient(135deg, #a855f7, #38bdf8);
+  color: #f8fafc;
 }
 @media (max-width: 640px) {
   .stage-panel {
@@ -728,6 +764,7 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
   }
   .stage-action-col {
     grid-column: 1 / -1;
+    flex-direction: row;
     justify-content: flex-end;
   }
 }

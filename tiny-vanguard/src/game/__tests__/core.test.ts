@@ -1573,4 +1573,72 @@ describe('Stage 3 Relic Enchantment & Resonance', () => {
     expect(session.player.maxHp).toBe(baseMaxHp + 25);
     session.dispose();
   });
+
+  it('equips star-blaster sidearm for non-blaster heroes in Bridge Defense', () => {
+    const regs = createDefaultRegistries();
+    const bridge = regs.levels.getOrThrow('bridge-defense');
+    const bastionBridge = new GameSession(999, bridge, regs, 'iron-bastion');
+    const ids = bastionBridge.player.weapons.map((w) => w.weaponId);
+    expect(ids).toContain('orbit-shields');
+    expect(ids).toContain('star-blaster');
+    bastionBridge.dispose();
+
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const bastionSurvival = new GameSession(999, meadow, regs, 'iron-bastion');
+    expect(bastionSurvival.player.weapons.map((w) => w.weaponId)).toEqual(['orbit-shields']);
+    bastionSurvival.dispose();
+  });
+
+  it('supports direct endless start via loadLevel(id, true) with starter boost', () => {
+    const rt = new GameRuntime();
+    expect(rt.loadLevel('astral-throne', true)).toBe(true);
+    const s = (rt as unknown as { session: GameSession }).session;
+    expect(s.endlessMode).toBe(true);
+    expect(s.player.level).toBe(5);
+    expect(s.pendingLevelUps).toBe(3);
+    rt.destroy();
+  });
+
+  it('supports debug instant clear only for normal stages 1-4 and blocks endless runs', () => {
+    const rt = new GameRuntime();
+    const bridge = new DebugBridge(rt);
+    expect(rt.loadLevel('meadow-arena')).toBe(true);
+    rt.start();
+    expect(bridge.getTelemetry().canInstantClear).toBe(true);
+    expect(bridge.instantClear()).toBe(true);
+    expect(bridge.getTelemetry().state).toBe('victory');
+
+    expect(rt.loadLevel('astral-throne', true)).toBe(true);
+    rt.start();
+    expect(bridge.getTelemetry().isEndless).toBe(true);
+    expect(bridge.getTelemetry().canInstantClear).toBe(false);
+    expect(bridge.instantClear()).toBe(false);
+    rt.destroy();
+  });
+
+  it('clamps extreme endless XP curve levels against Infinity/NaN overflow', () => {
+    const regs = createDefaultRegistries();
+    const astral = regs.levels.getOrThrow('astral-throne');
+    const session = new GameSession(1000, astral, regs);
+    const xp5000 = session.computeXpToNext(5000);
+    expect(Number.isFinite(xp5000)).toBe(true);
+    expect(xp5000).toBeGreaterThan(0);
+    expect(xp5000).toBeLessThanOrEqual(1_000_000_000);
+    session.dispose();
+  });
+
+  it('restricts enterEndlessMode to Stage 4 victory only (not Stages 1-3)', () => {
+    const rt = new GameRuntime();
+    const bridge = new DebugBridge(rt);
+    expect(rt.loadLevel('meadow-arena')).toBe(true);
+    rt.start();
+    expect(bridge.instantClear()).toBe(true);
+    expect(rt.enterEndlessMode()).toBe(false);
+
+    expect(rt.loadLevel('astral-throne')).toBe(true);
+    rt.start();
+    expect(bridge.instantClear()).toBe(true);
+    expect(rt.enterEndlessMode()).toBe(true);
+    rt.destroy();
+  });
 });

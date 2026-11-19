@@ -34,6 +34,21 @@ export const RELIC_ICONS: Readonly<Record<string, string>> = {
   'eq-pierce-quiver': '🏹',
 };
 
+export const WEAPON_ZH_NAMES: Readonly<Record<string, string>> = {
+  'star-blaster': '星辉连弹',
+  'orbit-shields': '守护星环',
+  'frost-nova': '寒霜震荡波',
+  'thunder-arc': '雷鸣链刃',
+  'rail-sniper': '星轨重狙',
+  'boomerang-axe': '回旋战斧',
+  'venom-aura': '毒雾力场',
+  'seeker-missile': '追踪飞弹',
+};
+
+export function getWeaponZhName(weaponId: string): string {
+  return WEAPON_ZH_NAMES[weaponId] ?? weaponId;
+}
+
 export function getWeaponIcon(weaponId: string): string {
   return WEAPON_ICONS[weaponId] ?? '⚔️';
 }

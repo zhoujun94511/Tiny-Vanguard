@@ -13,7 +13,7 @@ import {
   type GemTier,
   type GemTypeId,
 } from '../../game/content/gems/gems';
-import { getRelicIcon, getRelicTierClass } from '../../game/content/icons/itemIcons';
+import { getRelicIcon, getRelicTierClass, getWeaponZhName } from '../../game/content/icons/itemIcons';
 import {
   getTalentTotalInvested,
   getTalentUpgradeCost,
@@ -270,7 +270,7 @@ const isResonanceActive = computed(() => {
               <span v-else class="lock-tag">🔒</span>
             </div>
             <div class="talent-desc">
-              {{ tc(ch.startingWeaponId, 'name', ch.startingWeaponId) }} · 🧩 {{ getCharShards(ch.id) }}
+              {{ tc(ch.startingWeaponId, 'name', getWeaponZhName(ch.startingWeaponId)) }} · 🧩 {{ getCharShards(ch.id) }}
             </div>
           </div>
 

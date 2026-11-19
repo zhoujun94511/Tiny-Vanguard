@@ -60,7 +60,7 @@ const canUpgradeTalent = computed(() =>
   })
 );
 
-const { lang, t } = useI18n();
+const { t } = useI18n();
 
 interface ModeEntrySummary {
   mode: GameModeKey;
@@ -163,13 +163,6 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
           @click="settingsOpen = true"
         >
           ⚙️
-        </button>
-        <button
-          type="button"
-          class="lang-pill"
-          @click="emit('setLanguage', lang === 'zh' ? 'en' : 'zh')"
-        >
-          {{ lang === 'zh' ? 'EN' : '中文' }}
         </button>
       </div>
     </div>
@@ -386,22 +379,6 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
 }
 .audio-pill:hover {
   border-color: #ffd166;
-}
-.lang-pill {
-  min-width: 56px;
-  text-align: center;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(15, 23, 42, 0.8);
-  color: #f8fafc;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.lang-pill:hover {
-  border-color: #ffd166;
-  color: #ffd166;
 }
 .logo-section {
   position: relative;

@@ -8,6 +8,7 @@ import type { EquipmentDefinition } from '../../game/content/definitions/Content
 import {
   getRelicIcon,
   getRelicTierClass,
+  getWeaponZhName,
 } from '../../game/content/icons/itemIcons';
 import type { SaveData } from '../../game/core/GameTypes';
 import GameModal from '../common/GameModal.vue';
@@ -83,7 +84,7 @@ function getRelicName(relicId: string): string {
           :class="{ unlocked: isSynergyDiscovered(syn.weaponId) }"
         >
           <strong><WeaponSvgIcon :weapon-id="syn.weaponId" :size="15" /> {{ lang === 'en' ? syn.evolvedNameEn : syn.evolvedName }}</strong>
-          <span><WeaponSvgIcon :weapon-id="syn.weaponId" :size="12" /> {{ tc(syn.weaponId, 'name', syn.weaponId) }} + {{ getRelicIcon(syn.relicId) }} {{ getRelicName(syn.relicId) }}</span>
+          <span><WeaponSvgIcon :weapon-id="syn.weaponId" :size="12" /> {{ tc(syn.weaponId, 'name', getWeaponZhName(syn.weaponId)) }} + {{ getRelicIcon(syn.relicId) }} {{ getRelicName(syn.relicId) }}</span>
         </div>
       </div>
 

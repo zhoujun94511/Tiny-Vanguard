@@ -111,6 +111,10 @@ export class DebugBridge {
     return this.runtime.debugClearNormalEnemies();
   }
 
+  public instantClear(): boolean {
+    return this.runtime.debugInstantClear();
+  }
+
   public testAudioCue(kind: 'boss' | 'purify' | 'fever'): void {
     this.runtime.sound.unlock();
     if (kind === 'boss') {

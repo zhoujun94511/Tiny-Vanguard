@@ -253,6 +253,18 @@ function handleSelectLevel(levelId: string) {
   }
 }
 
+function handleSelectEndless(levelId: string) {
+  const now = performance.now();
+  if (gameState.value === 'loading' || now - lastStartLevelMs < 260) return;
+  if (!unlockedLevelIds.value[levelId]) return;
+  lastStartLevelMs = now;
+  result.value = null;
+  levelUpRequest.value = null;
+  if (runtime.loadLevel(levelId, true)) {
+    runtime.start();
+  }
+}
+
 function handleChooseUpgrade(upgradeId: string) {
   if (!levelUpRequest.value) return;
   runtime.dispatch({
@@ -454,6 +466,7 @@ function handleEnterEndless() {
       :save-data="saveData"
       :unlocked-level-ids="unlockedLevelIds"
       @select="handleSelectLevel"
+      @select-endless="handleSelectEndless"
       @select-character="handleSelectCharacter"
       @toggle-modifier="handleToggleModifier"
       @back="menuStep = 'main'; runtime.setMenuPreviewMode(null)"

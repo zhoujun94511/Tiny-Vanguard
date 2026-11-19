@@ -52,5 +52,5 @@
 ## 三、 门禁验证标准（自动化检查）
 1. `prebuild-check.mjs` 校验：0 循环依赖、安全红线、热循环零 GC，且校验 `BUFF_DEFS.length >= 20`、`DEBUFF_DEFS.length >= 20`、`EQUIPMENT_DEFS.length >= 20`、`UPGRADES.length >= 20`。
 2. `ConfigValidator.ts` 校验所有 4 个正式关卡（及测试关卡）配置完整且引用合法。
-3. `vitest` 测试覆盖：20 种 Debuff 执行、22 种 Buff 应用、20 种装备穿戴叠加、5 大战技联动、割草波次与 `xpCurve` 曲线、光栅线段扫掠防穿透、双模式 BOSS 平衡与 4 关卡配置加载（共 38 项测试）。
+3. `vitest` 测试覆盖：20 种 Debuff 执行、22 种 Buff 应用、20 种装备穿戴叠加、5 大战技联动、割草波次与 `xpCurve` 曲线、光栅线段扫掠防穿透、双模式 BOSS 平衡与 4 关卡配置加载（共 41 项测试）。
 4. `npm run gate` 含单文件体积与离线纯净度检查全绿，并通过 Chrome 实机截图验收。

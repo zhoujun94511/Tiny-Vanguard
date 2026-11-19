@@ -16,9 +16,9 @@ const knobY = ref(0);
 let activePointerId: number | null = null;
 let originX = 0;
 let originY = 0;
-const MAX_RADIUS = 46;
-const MAX_FLOAT = 26;
-const DEAD_ZONE = 0.085;
+const MAX_RADIUS = 34;
+const MAX_FLOAT = 28;
+const DEAD_ZONE = 0.045;
 
 function resetJoystick() {
   if (activePointerId !== null && zoneRef.value) {
@@ -59,7 +59,7 @@ function updateDelta(clientX: number, clientY: number) {
     return;
   }
   const remapped = (norm - DEAD_ZONE) / (1 - DEAD_ZONE);
-  const curved = remapped * (0.78 + 0.22 * remapped);
+  const curved = Math.min(1, Math.pow(remapped, 0.8));
   emit('move', (dx / dist) * curved, (dy / dist) * curved);
 }
 
@@ -141,9 +141,9 @@ onUnmounted(() => {
 .touch-joy-zone {
   position: fixed;
   left: max(16px, env(safe-area-inset-left, 16px));
-  bottom: max(18px, env(safe-area-inset-bottom, 18px));
-  width: 138px;
-  height: 138px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  width: 156px;
+  height: 156px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -207,27 +207,39 @@ onUnmounted(() => {
   box-shadow: 0 4px 14px rgba(44, 188, 255, 0.58);
   will-change: transform;
 }
-@media (max-width: 620px) {
+@media (max-width: 1024px) {
   .touch-joy-zone {
-    left: max(12px, env(safe-area-inset-left, 12px));
-    bottom: max(14px, env(safe-area-inset-bottom, 14px));
-    width: 120px;
-    height: 120px;
+    left: max(16px, env(safe-area-inset-left, 16px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 34px);
+    width: 144px;
+    height: 144px;
   }
   .touch-joy-base {
-    width: 102px;
-    height: 102px;
+    width: 116px;
+    height: 116px;
+  }
+}
+@media (max-width: 640px) {
+  .touch-joy-zone {
+    left: max(14px, env(safe-area-inset-left, 14px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 38px);
+    width: 136px;
+    height: 136px;
+  }
+  .touch-joy-base {
+    width: 116px;
+    height: 116px;
   }
   .touch-joy-knob {
     width: 44px;
     height: 44px;
   }
 }
-@media (max-height: 500px) {
+@media (max-height: 520px) {
   .touch-joy-zone {
-    width: 112px;
-    height: 112px;
-    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    width: 116px;
+    height: 116px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
   }
   .touch-joy-base {
     width: 96px;

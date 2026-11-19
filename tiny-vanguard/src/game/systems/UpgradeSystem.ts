@@ -1,5 +1,8 @@
 import { RUNTIME_CONFIG } from '../config/runtimeConfig';
 import type { UpgradeDefinition, UpgradeEffect } from '../content/definitions/ContentTypes';
+import { ENCHANT_MAP, parseEnchantId } from '../content/enchants/enchants';
+import { GEM_MAP, getGemStatValue, MAX_RELIC_RANK, parseGemKey } from '../content/gems/gems';
+import { TALENT_MAP } from '../content/talents/talents';
 import type { UpgradeChoiceView } from '../core/GameTypes';
 import type { GameSession } from '../session/GameSession';
 
@@ -164,6 +167,10 @@ export class UpgradeSystem {
     }
 
     p.maxHp = ch.baseHp + maxHpBonus;
+    if (session.hasGlassCannon) {
+      dmgMult += 0.55;
+      p.maxHp = Math.max(20, Math.round(p.maxHp * 0.65));
+    }
     p.hp = Math.min(p.hp, p.maxHp);
     p.moveSpeedMult = Math.min(RUNTIME_CONFIG.maxPlayerSpeedMultiplier, moveMult);
     p.damageMult = dmgMult;
@@ -179,6 +186,85 @@ export class UpgradeSystem {
     for (const w of p.weapons) {
       w.bonusCount = Math.min(RUNTIME_CONFIG.maxBonusProjectiles, w.bonusCount);
     }
+  }
+
+  public applyMetaTalents(
+    session: GameSession,
+    talents: Readonly<Record<string, number>>,
+    characterStars?: Readonly<Record<string, number>>,
+    loadoutRelicIds?: readonly string[],
+    relicRanks?: Readonly<Record<string, number>>,
+    relicSockets?: Readonly<Record<string, string | null>>,
+    relicEnchants?: Readonly<Record<string, string>>
+  ): void {
+    const dm = session.player.directModifiers;
+    const clampLvl = (id: string): number => {
+      const def = TALENT_MAP.get(id);
+      const raw = talents[id] ?? 0;
+      if (!def || !Number.isFinite(raw) || raw <= 0) return 0;
+      return Math.min(def.maxLevel, Math.floor(raw));
+    };
+
+    dm.damageBonus += clampLvl('might') * 0.06;
+    dm.maxHpBonus += clampLvl('vitality') * 18;
+    dm.attackSpeedBonus += clampLvl('swiftness') * 0.05;
+    dm.moveSpeedBonus += clampLvl('haste') * 0.04;
+    dm.pickupBonus += clampLvl('magnet') * 0.12;
+    dm.bossDamageBonus += clampLvl('bossSlayer') * 0.08;
+    session.rerollsRemaining = 2 + clampLvl('dice');
+
+    // Apply hero star rank progression (1★..5★)
+    const starLv = Math.max(
+      1,
+      Math.min(5, Math.floor(characterStars?.[session.character.id] ?? 1))
+    );
+    if (starLv > 1) {
+      const extraStars = starLv - 1;
+      dm.maxHpBonus += extraStars * 12;
+      dm.damageBonus += extraStars * 0.05;
+      if (session.character.id === 'storm-ranger') {
+        dm.critChanceBonus += extraStars * 0.03;
+      } else if (session.character.id === 'iron-bastion') {
+        session.player.maxShield = Math.max(session.player.maxShield, extraStars * 10);
+        session.player.shield = session.player.maxShield;
+      } else {
+        dm.attackSpeedBonus += extraStars * 0.04;
+      }
+    }
+
+    // Equip pre-selected loadout relics at run start (with refinement, gem, enchant & resonance)
+    if (loadoutRelicIds && loadoutRelicIds.length > 0) {
+      let highTierCount = 0;
+      for (const rid of loadoutRelicIds) {
+        const rank = Math.max(0, Math.min(MAX_RELIC_RANK, Math.floor(relicRanks?.[rid] ?? 0)));
+        this.equipItemById(session, rid, rank);
+        const eqDef = session.registries.equipment.get(rid);
+        if (eqDef && (eqDef.tier === 'rare' || eqDef.tier === 'epic' || eqDef.tier === 'legendary')) {
+          highTierCount += 1;
+        }
+        const gemParsed = parseGemKey(relicSockets?.[rid]);
+        if (gemParsed) {
+          const gemDef = GEM_MAP.get(gemParsed.type);
+          if (gemDef) {
+            dm[gemDef.statKey] += getGemStatValue(gemParsed.type, gemParsed.tier);
+          }
+        }
+        const enchantId = parseEnchantId(relicEnchants?.[rid]);
+        if (enchantId) {
+          const enchDef = ENCHANT_MAP.get(enchantId);
+          if (enchDef) {
+            dm[enchDef.statKey] += enchDef.value;
+          }
+        }
+      }
+      if (highTierCount >= 2) {
+        dm.damageBonus += 0.08;
+        dm.maxHpBonus += 20;
+      }
+    }
+
+    this.recalculateStats(session);
+    session.player.hp = session.player.maxHp;
   }
 
   /**
@@ -272,19 +358,31 @@ export class UpgradeSystem {
     return true;
   }
 
-  public equipItemById(session: GameSession, eqId: string): boolean {
+  public equipItemById(session: GameSession, eqId: string, refineRank = 0): boolean {
     const eq = session.registries.equipment.get(eqId);
     if (!eq) return false;
     if (session.player.equippedRelics.includes(eqId)) return false;
     session.player.equippedRelics.push(eqId);
-    this.applyDirectEffects(session, eq.effects);
+    const clampedRank = Math.max(0, Math.min(MAX_RELIC_RANK, Math.floor(refineRank)));
+    if (clampedRank <= 0) {
+      this.applyDirectEffects(session, eq.effects);
+      return true;
+    }
+    const mult = 1 + clampedRank * 0.15;
+    const scaled: UpgradeEffect[] = eq.effects.map((eff) => ({
+      ...eff,
+      value: eff.kind === 'player-imbue-debuff' ? eff.value : eff.value * mult,
+    }));
+    this.applyDirectEffects(session, scaled);
     return true;
   }
 
   public isUpgradeEligible(session: GameSession, def: UpgradeDefinition): boolean {
     const p = session.player;
     const currentLevel = p.upgradeLevels.get(def.id) ?? 0;
-    if (currentLevel >= def.maxLevel) return false;
+    if (!(session.endlessMode && def.id === 'stat-heal-fallback') && currentLevel >= def.maxLevel) {
+      return false;
+    }
 
     if (def.prerequisites) {
       for (const pre of def.prerequisites) {
@@ -335,25 +433,38 @@ export class UpgradeSystem {
   private toChoiceView(session: GameSession, def: UpgradeDefinition): UpgradeChoiceView {
     const cur = session.player.upgradeLevels.get(def.id) ?? 0;
     const next = Math.min(def.maxLevel, cur + 1);
+    const isEndlessLimitBreak = session.endlessMode && def.id === 'stat-heal-fallback';
     const badge =
-      def.category === 'weapon-unlock'
-        ? '新武器'
-        : def.category === 'weapon-upgrade'
-          ? '武器强化'
-          : def.category === 'survival'
-            ? '生存补给'
-            : '属性提升';
+      isEndlessLimitBreak
+        ? session.language === 'en'
+          ? 'Limit Break'
+          : '巅峰突破'
+        : def.category === 'weapon-unlock'
+          ? '新武器'
+          : def.category === 'weapon-upgrade'
+            ? '武器强化'
+            : def.category === 'survival'
+              ? '生存补给'
+              : '属性提升';
 
     return {
       upgradeId: def.id,
-      name: def.name,
-      description: def.description,
+      name: isEndlessLimitBreak
+        ? session.language === 'en'
+          ? 'Abyssal Limit Break'
+          : '深渊巅峰突破'
+        : def.name,
+      description: isEndlessLimitBreak
+        ? session.language === 'en'
+          ? 'Permanent DMG +6%, Max HP +10 & Heal 35%'
+          : '永久伤害 +6%、最大生命 +10 并回复 35% 生命'
+        : def.description,
       category: def.category,
       currentLevel: cur,
       nextLevel: next,
       maxLevel: def.maxLevel,
       currentEffectText: cur === 0 ? '未获得' : `当前 Lv.${cur}`,
-      nextEffectText: `升级至 Lv.${next}`,
+      nextEffectText: isEndlessLimitBreak ? '♾️ +1' : `升级至 Lv.${next}`,
       badge,
     };
   }
@@ -366,6 +477,11 @@ export class UpgradeSystem {
 
     const prev = session.player.upgradeLevels.get(upgradeId) ?? 0;
     session.player.upgradeLevels.set(upgradeId, prev + 1);
+
+    if (session.endlessMode && upgradeId === 'stat-heal-fallback') {
+      session.player.directModifiers.damageBonus += 0.06;
+      session.player.directModifiers.maxHpBonus += 10;
+    }
 
     for (const eff of def.effects) {
       if (eff.kind === 'unlock-weapon' && eff.weaponId) {

@@ -35,9 +35,9 @@ npm run gate
 `npm run gate` 会依次执行：
 1. `npm run check`：5 道构建前门禁（0 循环依赖、安全离线红线、构建同步、热循环零 GC、内容配额 >= 20 与关卡解耦）；
 2. `npm run type-check`：`vue-tsc --noEmit` 严格类型检查；
-3. `npm test`：38 项 Vitest 单元测试与无头全流程模拟；
+3. `npm test`：59 项 Vitest 单元测试与无头全流程模拟；
 4. `npm run build:single`：打包单 HTML 并同步 `../docs/index.html`；
-5. `npm run verify:single`：验证零外链、经典脚本兼容性、隔离目录运行及体积（当前 `1.015 MiB <= 1.5 MiB`）。
+5. `npm run verify:single`：验证零外链、经典脚本兼容性、隔离目录运行及体积（当前约 `1.138 MiB <= 1.5 MiB`）。
 
 也可运行通用离线纯净度审计脚本：
 

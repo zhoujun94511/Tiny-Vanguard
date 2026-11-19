@@ -2,20 +2,28 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Tiny Vanguard</title>
   <link rel="icon" type="image/png" href="/src/assets/favicon.png" />
   <style>
-    #boot-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 42%,#1e3a5f 0%,#0f172a 58%,#080d1a 100%);color:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,Roboto,'PingFang SC','Microsoft YaHei',sans-serif;transition:opacity .42s ease,visibility .42s ease;user-select:none;overflow:hidden}
+    html,body{margin:0;padding:0;width:100%;height:100%;background:#080d1a}
+    #boot-splash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;width:100%;height:100%;background:#0b1324;background:radial-gradient(circle at 50% 42%,#1e3a5f 0%,#0f172a 58%,#080d1a 100%);color:#f8fafc;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;transition:opacity .42s ease,visibility .42s ease;user-select:none;overflow:hidden}
     #boot-splash.fade-out{opacity:0;visibility:hidden;pointer-events:none}
-    .boot-orbit{position:relative;width:88px;height:88px;margin-bottom:22px;display:grid;place-items:center}
-    .boot-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,209,102,.18);border-top-color:#ffd166;border-right-color:#4ecdc4;animation:bootSpin 1.3s linear infinite}
-    .boot-ring.inner{inset:13px;border-width:2px;border-color:rgba(239,71,111,.16);border-bottom-color:#ef476f;animation:bootSpinRev 1.8s linear infinite}
-    .boot-core{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#ffd166 55%,#f4a261 100%);box-shadow:0 0 22px rgba(255,209,102,.85);animation:bootPulse 1.5s ease-in-out infinite}
-    .boot-title{font-size:clamp(22px,4vw,32px);font-weight:800;letter-spacing:.16em;text-transform:uppercase;background:linear-gradient(90deg,#ffffff 0%,#ffd166 52%,#72efdd 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-align:center;padding:0 16px}
-    .boot-sub{margin-top:10px;font-size:13px;letter-spacing:.06em;color:rgba(226,232,240,.78)}
-    .boot-bar{margin-top:20px;width:min(260px,68vw);height:4px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
-    .boot-bar-fill{width:25%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ffd166,#4ecdc4,#ef476f);transition:width .25s ease}
+    .boot-wrap{display:table;width:100%;height:100%;table-layout:fixed}
+    .boot-cell{display:table-cell;vertical-align:middle;text-align:center;padding:16px 12px}
+    .boot-orbit{position:relative;width:76px;height:76px;margin:0 auto 16px auto}
+    .boot-ring{position:absolute;top:0;left:0;right:0;bottom:0;border-radius:50%;border:2px solid rgba(255,209,102,.22);border-top-color:#ffd166;border-right-color:#4ecdc4;animation:bootSpin 1.3s linear infinite}
+    .boot-ring.inner{top:11px;left:11px;right:11px;bottom:11px;border-width:2px;border-color:rgba(239,71,111,.2);border-bottom-color:#ef476f;animation:bootSpinRev 1.8s linear infinite}
+    .boot-core{position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#ffd166;background:radial-gradient(circle,#fff 0%,#ffd166 55%,#f4a261 100%);box-shadow:0 0 20px rgba(255,209,102,.85);animation:bootPulse 1.5s ease-in-out infinite}
+    .boot-title{font-size:22px;line-height:1.25;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#ffd166;text-align:center;padding:0 8px;word-wrap:break-word}
+    @supports (-webkit-background-clip:text) or (background-clip:text){
+      .boot-title{font-size:clamp(18px,4vw,32px);background:linear-gradient(90deg,#ffffff 0%,#ffd166 52%,#72efdd 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    }
+    .boot-sub{margin-top:10px;font-size:13px;letter-spacing:.06em;color:#cbd5e1}
+    .boot-bar{margin:16px auto 0 auto;width:220px;max-width:74%;height:4px;border-radius:999px;background:#1e293b;background:rgba(255,255,255,.12);overflow:hidden}
+    .boot-bar-fill{width:28%;height:100%;border-radius:inherit;background:#4ecdc4;background:linear-gradient(90deg,#ffd166,#4ecdc4,#ef476f);transition:width .25s ease}
+    .boot-preview-tip{margin:14px auto 0 auto;max-width:260px;font-size:11px;line-height:1.5;color:#94a3b8}
     @keyframes bootSpin{to{transform:rotate(360deg)}}
     @keyframes bootSpinRev{to{transform:rotate(-360deg)}}
     @keyframes bootPulse{0%,100%{transform:scale(.92);opacity:.85}50%{transform:scale(1.18);opacity:1}}
@@ -23,14 +31,19 @@
 </head>
 <body>
   <div id="boot-splash" role="status" aria-live="polite">
-    <div class="boot-orbit" aria-hidden="true">
-      <div class="boot-ring"></div>
-      <div class="boot-ring inner"></div>
-      <div class="boot-core"></div>
+    <div class="boot-wrap">
+      <div class="boot-cell">
+        <div class="boot-orbit" aria-hidden="true">
+          <div class="boot-ring"></div>
+          <div class="boot-ring inner"></div>
+          <div class="boot-core"></div>
+        </div>
+        <div class="boot-title">Tiny Vanguard</div>
+        <div class="boot-sub" id="boot-splash-status">正在唤醒星辉先锋…</div>
+        <div class="boot-bar"><div class="boot-bar-fill" id="boot-splash-fill"></div></div>
+        <div class="boot-preview-tip">3D 动作割草生存 · 双击使用浏览器打开即可离线游玩</div>
+      </div>
     </div>
-    <div class="boot-title">Welcome to Tiny-Vanguard</div>
-    <div class="boot-sub" id="boot-splash-status">正在唤醒星辉先锋…</div>
-    <div class="boot-bar"><div class="boot-bar-fill" id="boot-splash-fill"></div></div>
   </div>
   <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>

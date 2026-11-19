@@ -10,9 +10,15 @@ import { SoundEngine } from '../audio/SoundEngine';
 import { validateLevelConfig } from '../content/registries/ConfigValidator';
 import { DEBUFF_BY_ID } from '../content/effects/debuffs';
 import { createDefaultRegistries } from '../content/registries/DefaultContent';
+import {
+  getTalentTotalInvested,
+  getTalentUpgradeCost,
+  TALENT_MAP,
+} from '../content/talents/talents';
 import { GameClock } from '../core/GameClock';
 import { GameRuntime } from '../core/GameRuntime';
 import { GameStateMachine } from '../core/GameStateMachine';
+import { computePreRunPreviewStats } from '../core/PreRunPreview';
 import { createF9DoublePressDetector, DebugBridge } from '../debug/DebugBridge';
 import { ObjectPool } from '../pool/ObjectPool';
 import { CameraController } from '../scene/CameraController';
@@ -82,11 +88,26 @@ describe('ConfigValidator & Registries', () => {
     expect(regs.upgrades.list().length).toBeGreaterThanOrEqual(20);
 
     const rt = new GameRuntime(regs);
-    expect(rt.getLevelsByMode('survival').map((l) => l.id)).toEqual(['meadow-arena', 'ember-canyon']);
-    expect(rt.getLevelsByMode('defense').map((l) => l.id)).toEqual(['bridge-defense', 'frost-bridge']);
+    expect(rt.getLevelsByMode('survival').map((l) => l.id)).toEqual([
+      'meadow-arena',
+      'ember-canyon',
+      'shadow-ruins',
+      'astral-throne',
+    ]);
+    expect(rt.getLevelsByMode('defense').map((l) => l.id)).toEqual([
+      'bridge-defense',
+      'frost-bridge',
+      'iron-viaduct',
+      'abyss-span',
+    ]);
     expect(rt.getNextLevelInMode('meadow-arena')?.id).toBe('ember-canyon');
-    expect(rt.getNextLevelInMode('ember-canyon')).toBeNull();
+    expect(rt.getNextLevelInMode('ember-canyon')?.id).toBe('shadow-ruins');
+    expect(rt.getNextLevelInMode('shadow-ruins')?.id).toBe('astral-throne');
+    expect(rt.getNextLevelInMode('astral-throne')).toBeNull();
     expect(rt.getNextLevelInMode('bridge-defense')?.id).toBe('frost-bridge');
+    expect(rt.getNextLevelInMode('frost-bridge')?.id).toBe('iron-viaduct');
+    expect(rt.getNextLevelInMode('iron-viaduct')?.id).toBe('abyss-span');
+    expect(rt.getNextLevelInMode('abyss-span')).toBeNull();
     rt.destroy();
   });
 
@@ -486,14 +507,15 @@ describe('Audit Regression Suite (P0 Race Conditions & P1 Algorithms)', () => {
     input.setEnabled(true);
     const mv = { x: 0, y: 0 };
 
-    // Arrow keys must NOT drive desktop movement
+    // Arrow keys drive movement smoothly alongside WASD
     const keysDown = (input as unknown as { keysDown: Set<string> }).keysDown;
     keysDown.add('ArrowUp');
     keysDown.add('ArrowLeft');
     input.getMoveVector(mv);
-    expect(mv.x).toBe(0);
-    expect(mv.y).toBe(0);
+    expect(mv.x).toBeCloseTo(-Math.SQRT1_2, 4);
+    expect(mv.y).toBeCloseTo(-Math.SQRT1_2, 4);
 
+    keysDown.clear();
     keysDown.add('KeyD');
     input.getMoveVector(mv);
     expect(mv.x).toBe(1);
@@ -820,7 +842,7 @@ describe('Audit Regression Suite (P0 Race Conditions & P1 Algorithms)', () => {
     session.dispose();
   });
 
-  it('clamps Bridge Defense hero within the visible 2.45m tactical defense bay', () => {
+  it('clamps Bridge Defense hero within the visible 3.95m tactical defense bay', () => {
     const regs = createDefaultRegistries();
     const bridge = regs.levels.getOrThrow('bridge-defense');
     const session = new GameSession(214, bridge, regs);
@@ -830,13 +852,725 @@ describe('Audit Regression Suite (P0 Race Conditions & P1 Algorithms)', () => {
 
     session.player.z = 0; // way past front boundary
     movement.updatePlayer(session, input, 0.016);
-    expect(session.player.z).toBeCloseTo(defZ - 3.3, 4);
+    expect(session.player.z).toBeCloseTo(defZ - 4.8, 4);
 
     session.player.z = defZ + 2; // way past rear defense line
     movement.updatePlayer(session, input, 0.016);
     expect(session.player.z).toBeCloseTo(defZ - 0.85, 4);
 
     input.dispose();
+    session.dispose();
+  });
+
+  it('supports Arrow keys alongside WASD in InputController', () => {
+    const input = new InputController();
+    input.setEnabled(true);
+    const keys = (input as unknown as { keysDown: Set<string> }).keysDown;
+    const vec = { x: 0, y: 0 };
+
+    keys.add('ArrowRight');
+    keys.add('ArrowUp');
+    input.getMoveVector(vec);
+    expect(vec.x).toBeCloseTo(Math.SQRT1_2, 4);
+    expect(vec.y).toBeCloseTo(-Math.SQRT1_2, 4);
+
+    input.clearAll();
+    keys.add('KeyA');
+    keys.add('ArrowDown');
+    input.getMoveVector(vec);
+    expect(vec.x).toBeCloseTo(-Math.SQRT1_2, 4);
+    expect(vec.y).toBeCloseTo(Math.SQRT1_2, 4);
+
+    input.dispose();
+  });
+
+  it('enforces 1-of-2 walk-through claim for dual Bridge Defense gates', () => {
+    const regs = createDefaultRegistries();
+    const bridge = regs.levels.getOrThrow('bridge-defense');
+    const session = new GameSession(215, bridge, regs);
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+
+    prog.spawnBridgeGatesPair(session, false);
+    expect(session.bridgeGates[0].active).toBe(true);
+    expect(session.bridgeGates[1].active).toBe(true);
+
+    // Position hero in front of left gate as it reaches player Z
+    session.player.x = session.bridgeGates[0].x;
+    session.player.z = 8.4;
+    session.bridgeGates[0].z = 8.2;
+    session.bridgeGates[1].z = 8.2;
+
+    prog.update(session, 0.016, combat, null);
+    // Claiming left gate must immediately close both gates (strict 1-of-2 choice)
+    expect(session.bridgeGates[0].active).toBe(false);
+    expect(session.bridgeGates[1].active).toBe(false);
+
+    // Maxed Lv.3 gate keeps full HP when hit instead of draining/resetting
+    prog.spawnBridgeGatesPair(session, false);
+    const g0 = session.bridgeGates[0];
+    g0.chargeTier = g0.maxChargeTier;
+    g0.hp = g0.maxHp;
+    session.player.x = g0.x;
+    session.player.z = 8.4;
+    g0.z = 0;
+    session.player.weapons[0].cooldownTimer = 0;
+    combat.update(session, 0.05, null, null);
+    expect(g0.hp).toBe(g0.maxHp);
+    expect(g0.chargeTier).toBe(g0.maxChargeTier);
+    session.dispose();
+  });
+
+  it('stops spawning bridge gates near Boss window, clears residual gates on Boss spawn, and orders stage durations', () => {
+    const regs = createDefaultRegistries();
+    const bridge = regs.levels.getOrThrow('bridge-defense');
+    const frost = regs.levels.getOrThrow('frost-bridge');
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const canyon = regs.levels.getOrThrow('ember-canyon');
+
+    expect(canyon.bossStage.triggerSec).toBeGreaterThanOrEqual(meadow.bossStage.triggerSec);
+    expect(frost.bossStage.triggerSec).toBeGreaterThanOrEqual(bridge.bossStage.triggerSec);
+
+    const session = new GameSession(512, bridge, regs);
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+
+    // Near Boss pre-spawn window (triggerSec - 14), expired timer must not spawn new gates
+    session.elapsedSec = bridge.bossStage.triggerSec - 13;
+    session.bridgeGateTimer = 0;
+    prog.update(session, 0.016, combat, null);
+    expect(session.bridgeGates[0].active).toBe(false);
+    expect(session.bridgeGates[1].active).toBe(false);
+
+    // If gates were already active when Boss spawns, they must be cleared immediately
+    prog.spawnBridgeGatesPair(session, false);
+    expect(session.bridgeGates[0].active).toBe(true);
+    session.bossSpawned = true;
+    prog.update(session, 0.016, combat, null);
+    expect(session.bridgeGates[0].active).toBe(false);
+    expect(session.bridgeGates[1].active).toBe(false);
+    session.dispose();
+  });
+
+  it('applies meta Armory talents to GameSession stats and computes talent costs/refunds accurately', () => {
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(700, meadow, regs);
+    const upg = new UpgradeSystem();
+    const baseHp = session.player.maxHp;
+    const baseDmg = session.player.damageMult;
+    const baseAtkSpd = session.player.attackSpeedMult;
+
+    const talents = { might: 2, vitality: 3, swiftness: 2, haste: 1, magnet: 2, greed: 1 };
+    upg.applyMetaTalents(session, talents);
+
+    expect(session.player.maxHp).toBe(baseHp + 3 * 18);
+    expect(session.player.hp).toBe(session.player.maxHp);
+    expect(session.player.damageMult).toBeCloseTo(baseDmg + 2 * 0.06, 5);
+    expect(session.player.attackSpeedMult).toBeCloseTo(baseAtkSpd + 2 * 0.05, 5);
+
+    const mightDef = TALENT_MAP.get('might')!;
+    expect(getTalentUpgradeCost(mightDef, 0)).toBe(12);
+    expect(getTalentUpgradeCost(mightDef, 1)).toBe(22);
+    expect(getTalentTotalInvested({ might: 2 })).toBe(12 + 22);
+
+    const storage = new SaveStorage();
+    const save = storage.load();
+    expect(save.stars).toBeGreaterThanOrEqual(0);
+    expect(typeof save.talents).toBe('object');
+    session.dispose();
+  });
+
+  it('activates Guard Drones and Blast Wave effects from new Bridge gate types', () => {
+    const regs = createDefaultRegistries();
+    const bridge = regs.levels.getOrThrow('bridge-defense');
+    const session = new GameSession(701, bridge, regs);
+    const combat = new CombatSystem();
+
+    // 1. Guard Drones gate activates 22s twin drone barrage
+    const droneGate = session.bridgeGates[0];
+    droneGate.active = true;
+    droneGate.corrupted = false;
+    droneGate.gateMode = 'charge';
+    droneGate.gateEffect = 'summon-drones';
+    droneGate.chargeTier = 2;
+
+    combat.claimChargeGate(session, droneGate, null);
+    expect(session.player.bridgeDroneTimer).toBe(22);
+    expect(session.player.bridgeDronePower).toBeCloseTo(1.45, 5);
+
+    // Put regular weapons on cooldown and verify drones fire twin forward bolts
+    session.player.weapons.forEach((w) => {
+      w.cooldownTimer = 99;
+    });
+    session.player.bridgeDroneFireTimer = 0;
+    combat.update(session, 0.016, null, null);
+    expect(session.playerProjectiles.activeCount).toBe(2);
+
+    // 2. Blast Wave gate damages and knocks back frontline enemies
+    const foe = session.enemies.acquire()!;
+    foe.hp = 500;
+    foe.maxHp = 500;
+    foe.x = 0;
+    foe.z = 4;
+    const blastGate = session.bridgeGates[1];
+    blastGate.active = true;
+    blastGate.corrupted = false;
+    blastGate.gateMode = 'charge';
+    blastGate.gateEffect = 'blast-wave';
+    blastGate.chargeTier = 1;
+
+    combat.claimChargeGate(session, blastGate, null);
+    expect(foe.hp).toBeLessThan(500);
+    expect(foe.kbVz).toBeLessThan(0);
+    session.dispose();
+  });
+
+  it('supports 3 playable hero archetypes, Stage 3 levels, and Iron Viaduct explosive barrels', () => {
+    const regs = createDefaultRegistries();
+    expect(regs.characters.list().map((c) => c.id)).toEqual([
+      'chibi-knight',
+      'storm-ranger',
+      'iron-bastion',
+    ]);
+
+    const ruins = regs.levels.getOrThrow('shadow-ruins');
+    const viaduct = regs.levels.getOrThrow('iron-viaduct');
+    expect(ruins.stageOrder).toBe(3);
+    expect(viaduct.stageOrder).toBe(3);
+    expect(viaduct.bridgeBarrels).toBe(true);
+
+    // Character override initializes signature starting weapon and base stats
+    const rangerSession = new GameSession(801, ruins, regs, 'storm-ranger');
+    expect(rangerSession.player.maxHp).toBe(96);
+    expect(rangerSession.player.weapons[0].weaponId).toBe('thunder-arc');
+    rangerSession.dispose();
+
+    const bastionSession = new GameSession(802, viaduct, regs, 'iron-bastion');
+    expect(bastionSession.player.maxHp).toBe(175);
+    expect(bastionSession.player.weapons[0].weaponId).toBe('orbit-shields');
+
+    // Explosive Bridge Barrel damages and knocks back enemies in radius
+    const combat = new CombatSystem();
+    const foe = bastionSession.enemies.acquire()!;
+    foe.hp = 400;
+    foe.maxHp = 400;
+    foe.x = 1.2;
+    foe.z = -5.0;
+    bastionSession.enemyGrid.clear();
+    bastionSession.enemyGrid.insert(foe.slotIndex, foe.x, foe.z);
+
+    bastionSession.bridgeBarrel.active = true;
+    bastionSession.bridgeBarrel.x = 0;
+    bastionSession.bridgeBarrel.z = -4.0;
+    combat.detonateBridgeBarrel(bastionSession, null);
+
+    expect(bastionSession.bridgeBarrel.active).toBe(false);
+    expect(foe.hp).toBeLessThan(400);
+    expect(foe.kbVz).toBeLessThan(0);
+    bastionSession.dispose();
+  });
+
+  it('applies challenge modifiers (glass-cannon, hyper-horde) and drives Endless Abyss scaling', () => {
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(901, meadow, regs);
+    const upg = new UpgradeSystem();
+    const exp = new ExperienceSystem();
+    const prog = new LevelProgressionSystem();
+    const wave = new EnemyWaveSystem();
+    const combat = new CombatSystem();
+
+    const baseHp = session.player.maxHp;
+    const baseDmg = session.player.damageMult;
+    session.setModifiers(['glass-cannon', 'hyper-horde']);
+    upg.recalculateStats(session);
+
+    expect(session.player.damageMult).toBeCloseTo(baseDmg + 0.55, 5);
+    expect(session.player.maxHp).toBe(Math.round(baseHp * 0.65));
+
+    exp.grantXp(session, 10, null);
+    expect(session.player.xp).toBe(12); // +20% XP from hyper-horde
+
+    // Endless Mode prevents victory termination and escalates endlessWaveLevel every 45s
+    const fsm = new GameStateMachine();
+    expect(fsm.setState('loading')).toBe(true);
+    expect(fsm.setState('playing')).toBe(true);
+    expect(fsm.setState('victory')).toBe(true);
+    expect(fsm.enterEndlessFromVictory()).toBe(true);
+    expect(fsm.state).toBe('playing');
+
+    session.bossSpawned = true;
+    session.bossKilled = true;
+    session.endlessMode = true;
+    session.endlessStartedAtSec = 450;
+    session.elapsedSec = 545; // 95s into endless -> Tier 3 (1 + floor(95/45))
+
+    const outcome = prog.update(session, 0.016, combat, null);
+    expect(outcome.terminal).toBe(false);
+
+    wave.update(
+      session,
+      0.016,
+      { centerX: 0, centerZ: 0, halfWidth: 10, halfDepth: 9 },
+      combat,
+      null
+    );
+    expect(session.endlessWaveLevel).toBe(3);
+    session.dispose();
+  });
+
+  it('exercises Stage 4 mechanics (HazardZone, MovingGates, BridgeMeteor), 3 new weapons, and Codex/Achievements', () => {
+    const regs = createDefaultRegistries();
+    const throne = regs.levels.getOrThrow('astral-throne');
+    const abyss = regs.levels.getOrThrow('abyss-span');
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+
+    // 1. Astral Throne HazardZone damages player inside active zone after telegraph
+    const throneSession = new GameSession(950, throne, regs);
+    throneSession.hazardZone.active = true;
+    throneSession.hazardZone.x = throneSession.player.x;
+    throneSession.hazardZone.z = throneSession.player.z;
+    throneSession.hazardZone.telegraphSec = 0;
+    throneSession.hazardZone.remainingSec = 5;
+    throneSession.hazardZone.tickTimer = 0;
+    const hpBefore = throneSession.player.hp;
+    prog.update(throneSession, 0.05, combat, null);
+    expect(throneSession.player.hp).toBeLessThan(hpBefore);
+
+    // 2. 3 new weapons unlock and execute zero-GC combat behaviors
+    const upg = new UpgradeSystem();
+    expect(upg.applyUpgrade(throneSession, 'unlock-boomerang-axe')).toBe(true);
+    expect(upg.applyUpgrade(throneSession, 'unlock-venom-aura')).toBe(true);
+    expect(upg.applyUpgrade(throneSession, 'unlock-seeker-missile')).toBe(true);
+    const mob = throneSession.enemies.acquire()!;
+    mob.hp = 300;
+    mob.maxHp = 300;
+    mob.x = throneSession.player.x + 2;
+    mob.z = throneSession.player.z;
+    throneSession.enemyGrid.clear();
+    throneSession.enemyGrid.insert(mob.slotIndex, mob.x, mob.z);
+    for (const w of throneSession.player.weapons) {
+      w.cooldownTimer = 0;
+    }
+    combat.update(throneSession, 0.016, null, null);
+    expect(mob.hp).toBeLessThan(300);
+    throneSession.dispose();
+
+    // 3. Abyss Span MovingGates & Shootable Boss Meteor
+    const abyssSession = new GameSession(951, abyss, regs);
+    prog.spawnBridgeGatesPair(abyssSession, false);
+    const initialX = abyssSession.bridgeGates[0].x;
+    abyssSession.elapsedSec = 1.1;
+    prog.update(abyssSession, 0.016, combat, null);
+    expect(abyssSession.bridgeGates[0].x).not.toBe(initialX);
+
+    abyssSession.bossSpawned = true;
+    abyssSession.bridgeMeteor.active = true;
+    abyssSession.bridgeMeteor.x = 0;
+    abyssSession.bridgeMeteor.z = abyss.bridgeConfig!.defenseLineZ - 0.5;
+    const abyssHpBefore = abyssSession.player.hp;
+    prog.update(abyssSession, 0.05, combat, null);
+    expect(abyssSession.bridgeMeteor.active).toBe(false);
+    expect(abyssSession.player.hp).toBeLessThan(abyssHpBefore);
+    abyssSession.dispose();
+
+    // 4. Codex & Achievements catalog check
+    const rt = new GameRuntime(regs);
+    expect(rt.getRelicCatalog().length).toBeGreaterThanOrEqual(20);
+    expect(rt.getAchievements().length).toBe(8);
+    rt.destroy();
+  });
+
+  it('activates Boss HUD state on Endless Boss spawn and resumes Bridge gates after Endless Boss kill', () => {
+    const regs = createDefaultRegistries();
+    const abyss = regs.levels.getOrThrow('abyss-span');
+    const session = new GameSession(990, abyss, regs);
+    const wave = new EnemyWaveSystem();
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+
+    session.endlessMode = true;
+    session.endlessStartedAtSec = 315;
+    session.elapsedSec = 370;
+    session.bossSpawned = false;
+    session.bossKilled = false;
+    session.endlessBossTimer = 0.01;
+
+    wave.update(
+      session,
+      0.016,
+      { centerX: 0, centerZ: 0, halfWidth: 10, halfDepth: 12 },
+      combat,
+      null
+    );
+    expect(session.bossSpawned).toBe(true);
+    expect(session.bossKilled).toBe(false);
+    const firstBossSlot = session.bossSlot;
+
+    // While first Endless Boss is alive, timer must not overwrite it with a 2nd Boss
+    session.endlessBossTimer = 0;
+    wave.update(
+      session,
+      0.016,
+      { centerX: 0, centerZ: 0, halfWidth: 10, halfDepth: 12 },
+      combat,
+      null
+    );
+    expect(session.bossSlot).toBe(firstBossSlot);
+
+    // After Endless Boss is defeated, progression grants bounty, resets bossSpawned, and Bridge gates resume
+    session.player.hp = 50;
+    session.bossKilled = true;
+    session.bridgeGateTimer = 0;
+    const outcome = prog.update(session, 0.016, combat, null);
+    expect(outcome.terminal).toBe(false);
+    expect(session.endlessBossKills).toBe(1);
+    expect(session.bossSpawned).toBe(false);
+    expect(session.player.hp).toBeGreaterThan(50);
+    expect(session.bridgeGates[0].active).toBe(true);
+    expect(session.bridgeGates[1].active).toBe(true);
+    session.dispose();
+  });
+
+  it('scales Stage 4 hazardZone and bridgeMeteor damage by player maxHp percentage', () => {
+    const regs = createDefaultRegistries();
+    const throne = regs.levels.getOrThrow('astral-throne');
+    const abyss = regs.levels.getOrThrow('abyss-span');
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+
+    const s1 = new GameSession(991, throne, regs);
+    s1.player.maxHp = 300;
+    s1.player.hp = 300;
+    s1.hazardZone.active = true;
+    s1.hazardZone.x = s1.player.x;
+    s1.hazardZone.z = s1.player.z;
+    s1.hazardZone.telegraphSec = 0;
+    s1.hazardZone.remainingSec = 5;
+    s1.hazardZone.tickTimer = 0;
+    prog.update(s1, 0.05, combat, null);
+    expect(s1.player.hp).toBe(300 - Math.round(300 * 0.04));
+    s1.dispose();
+
+    const s2 = new GameSession(992, abyss, regs);
+    s2.player.maxHp = 300;
+    s2.player.hp = 300;
+    s2.bossSpawned = true;
+    s2.bridgeMeteor.active = true;
+    s2.bridgeMeteor.x = 0;
+    s2.bridgeMeteor.z = abyss.bridgeConfig!.defenseLineZ - 0.5;
+    prog.update(s2, 0.05, combat, null);
+    expect(s2.player.hp).toBe(300 - Math.round(300 * 0.18));
+    s2.dispose();
+  });
+
+  it('scales spawnVfxBurst particle count via session.vfxScale quality multiplier', () => {
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(993, meadow, regs);
+
+    session.vfxScale = 1.0;
+    session.spawnVfxBurst(0, 0, 0, 0xffffff, 10);
+    expect(session.vfx.activeCount).toBe(10);
+
+    session.vfx.releaseAll();
+    session.vfxScale = 0.65;
+    session.spawnVfxBurst(0, 0, 0, 0xffffff, 10);
+    expect(session.vfx.activeCount).toBe(7);
+
+    session.vfx.releaseAll();
+    session.vfxScale = 0.5;
+    session.spawnVfxBurst(0, 0, 0, 0xffffff, 2);
+    expect(session.vfx.activeCount).toBe(2);
+    session.dispose();
+  });
+});
+
+describe('Stage 1 Core Growth Loop', () => {
+  it('distributes all 20 relics across 5 rarity tiers (common..legendary)', () => {
+    const regs = createDefaultRegistries();
+    const tiers = new Set(regs.equipment.list().map((r) => r.tier));
+    expect(tiers.has('common')).toBe(true);
+    expect(tiers.has('uncommon')).toBe(true);
+    expect(tiers.has('rare')).toBe(true);
+    expect(tiers.has('epic')).toBe(true);
+    expect(tiers.has('legendary')).toBe(true);
+    expect(regs.equipment.getOrThrow('eq-holy-relic').tier).toBe('legendary');
+    expect(regs.equipment.getOrThrow('eq-executioner-blade').tier).toBe('legendary');
+  });
+
+  it('applies dice, bossSlayer, hero star bonuses, and loadout relics in applyMetaTalents', () => {
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(994, meadow, regs);
+    const baseHp = session.player.maxHp;
+
+    const upg = new UpgradeSystem();
+    upg.applyMetaTalents(
+      session,
+      {
+        might: 0,
+        vitality: 0,
+        swiftness: 0,
+        greed: 0,
+        haste: 0,
+        magnet: 0,
+        dice: 2,
+        bossSlayer: 3,
+      },
+      { 'chibi-knight': 3 },
+      ['eq-vampiric-chalice']
+    );
+
+    expect(session.rerollsRemaining).toBe(4);
+    expect(session.player.directModifiers.bossDamageBonus).toBeCloseTo(0.24, 5);
+    expect(session.player.maxHp).toBe(baseHp + 24);
+    expect(session.player.directModifiers.damageBonus).toBeGreaterThanOrEqual(0.09);
+    expect(session.player.equippedRelics).toContain('eq-vampiric-chalice');
+
+    const combat = new CombatSystem();
+    const normalEnemy = session.enemies.acquire()!;
+    normalEnemy.active = true;
+    normalEnemy.hp = 500;
+    normalEnemy.maxHp = 500;
+    normalEnemy.isBoss = false;
+    normalEnemy.isElite = false;
+
+    const bossEnemy = session.enemies.acquire()!;
+    bossEnemy.active = true;
+    bossEnemy.hp = 5000;
+    bossEnemy.maxHp = 5000;
+    bossEnemy.isBoss = true;
+    bossEnemy.isElite = false;
+
+    combat.damageEnemy(session, normalEnemy, 100, 0, 0, null, true);
+    combat.damageEnemy(session, bossEnemy, 100, 0, 0, null, true);
+    expect(5000 - bossEnemy.hp).toBeGreaterThan(500 - normalEnemy.hp);
+    session.dispose();
+  });
+
+  it('auto-unlocks all heroes on legacy victory saves and keeps defaults on fresh saves', () => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(APP_CONFIG.storageKey, JSON.stringify({ victories: 1, stars: 10 }));
+      const legacy = new SaveStorage().load();
+      expect(legacy.unlockedCharacters).toContain('chibi-knight');
+      expect(legacy.unlockedCharacters).toContain('storm-ranger');
+      expect(legacy.unlockedCharacters).toContain('iron-bastion');
+
+      window.localStorage.setItem(APP_CONFIG.storageKey, JSON.stringify({}));
+      const fresh = new SaveStorage().load();
+      expect(fresh.unlockedCharacters).toEqual(['chibi-knight']);
+      expect(fresh.loadoutSlotsUnlocked).toBe(1);
+      expect(fresh.loadoutRelicIds).toEqual([]);
+      window.localStorage.removeItem(APP_CONFIG.storageKey);
+    } else {
+      const fresh = new SaveStorage().load();
+      expect(fresh.unlockedCharacters).toEqual(['chibi-knight']);
+      expect(fresh.loadoutSlotsUnlocked).toBe(1);
+    }
+  });
+
+  it('enforces progressive level unlock, hero shard/star progression, and loadout slots', () => {
+    const rt = new GameRuntime();
+    expect(rt.isLevelUnlocked('meadow-arena')).toBe(true);
+    expect(rt.isLevelUnlocked('ember-cauldron')).toBe(false);
+    expect(rt.isLevelUnlocked('ember-cauldron', true)).toBe(true);
+
+    const save = (rt as unknown as { saveData: ReturnType<GameRuntime['getSaveData']> & { stars: number } }).saveData;
+    save.stars = 100;
+    save.characterShards['chibi-knight'] = 10;
+    save.discoveredRelics.push('eq-holy-relic', 'eq-wind-boots');
+
+    expect(rt.unlockCharacter('storm-ranger')).toBe(true);
+    expect(rt.getSaveData().unlockedCharacters).toContain('storm-ranger');
+    expect(rt.starUpCharacter('chibi-knight')).toBe(true);
+    expect(rt.getSaveData().characterStars['chibi-knight']).toBe(2);
+
+    expect(rt.toggleLoadoutRelic('eq-holy-relic')).toBe(true);
+    expect(rt.toggleLoadoutRelic('eq-wind-boots')).toBe(false);
+    expect(rt.unlockSecondLoadoutSlot()).toBe(true);
+    expect(rt.toggleLoadoutRelic('eq-wind-boots')).toBe(true);
+    expect(rt.getSaveData().loadoutRelicIds).toEqual(['eq-holy-relic', 'eq-wind-boots']);
+  });
+});
+
+describe('Stage 2 Relic Refinement & Gem Workshop', () => {
+  it('refines discovered relics and scales loadout relic bonus in applyMetaTalents', () => {
+    const rt = new GameRuntime();
+    const save = (rt as unknown as { saveData: ReturnType<GameRuntime['getSaveData']> & { stars: number } }).saveData;
+    save.stars = 100;
+    save.discoveredRelics.push('eq-wind-boots');
+
+    expect(rt.refineRelic('eq-wind-boots')).toBe(true);
+    expect(rt.refineRelic('eq-wind-boots')).toBe(true);
+    expect(rt.getSaveData().relicRanks['eq-wind-boots']).toBe(2);
+    expect(rt.getSaveData().stars).toBe(100 - 8 - 16);
+
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const sBase = new GameSession(995, meadow, regs);
+    const sRefined = new GameSession(995, meadow, regs);
+    const upg = new UpgradeSystem();
+    const emptyTalents = {
+      might: 0,
+      vitality: 0,
+      swiftness: 0,
+      greed: 0,
+      haste: 0,
+      magnet: 0,
+      dice: 0,
+      bossSlayer: 0,
+    };
+    upg.applyMetaTalents(sBase, emptyTalents, undefined, ['eq-wind-boots'], {}, {});
+    upg.applyMetaTalents(
+      sRefined,
+      emptyTalents,
+      undefined,
+      ['eq-wind-boots'],
+      { 'eq-wind-boots': 2 },
+      {}
+    );
+    expect(sRefined.player.directModifiers.moveSpeedBonus).toBeGreaterThan(
+      sBase.player.directModifiers.moveSpeedBonus
+    );
+    sBase.dispose();
+    sRefined.dispose();
+  });
+
+  it('supports unlocking sockets, 3-to-1 gem fusion, socketing, unsocketing, and run start stats', () => {
+    const rt = new GameRuntime();
+    const save = (rt as unknown as { saveData: ReturnType<GameRuntime['getSaveData']> & { stars: number } }).saveData;
+    save.stars = 50;
+    save.discoveredRelics.push('eq-holy-relic');
+    save.gemInventory['ruby:1'] = 3;
+
+    expect(rt.fuseGem('ruby', 1)).toBe(true);
+    expect(rt.getSaveData().gemInventory['ruby:1']).toBeUndefined();
+    expect(rt.getSaveData().gemInventory['ruby:2']).toBe(1);
+
+    expect(rt.unlockRelicSocket('eq-holy-relic')).toBe(true);
+    expect(rt.socketGem('eq-holy-relic', 'ruby:2')).toBe(true);
+    expect(rt.getSaveData().relicSockets['eq-holy-relic']).toBe('ruby:2');
+    expect(rt.getSaveData().gemInventory['ruby:2']).toBeUndefined();
+
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(996, meadow, regs);
+    const upg = new UpgradeSystem();
+    upg.applyMetaTalents(
+      session,
+      {
+        might: 0,
+        vitality: 0,
+        swiftness: 0,
+        greed: 0,
+        haste: 0,
+        magnet: 0,
+        dice: 0,
+        bossSlayer: 0,
+      },
+      undefined,
+      ['eq-holy-relic'],
+      {},
+      rt.getSaveData().relicSockets
+    );
+    expect(session.player.directModifiers.damageBonus).toBeCloseTo(0.08, 5);
+    session.dispose();
+
+    expect(rt.unsocketGem('eq-holy-relic')).toBe(true);
+    expect(rt.getSaveData().relicSockets['eq-holy-relic']).toBeNull();
+    expect(rt.getSaveData().gemInventory['ruby:2']).toBe(1);
+  });
+});
+
+describe('Stage 3 Relic Enchantment & Resonance', () => {
+  it('enchants discovered relics and applies enchant + 2-slot Rare+ resonance in applyMetaTalents', () => {
+    const rt = new GameRuntime();
+    const save = (rt as unknown as { saveData: ReturnType<GameRuntime['getSaveData']> & { stars: number } }).saveData;
+    save.stars = 50;
+    save.discoveredRelics.push('eq-holy-relic', 'eq-vampiric-chalice');
+
+    expect(rt.enchantRelic('eq-holy-relic')).toBe(true);
+    const first = rt.getSaveData().relicEnchants['eq-holy-relic'];
+    expect(first).toBeTruthy();
+    expect(rt.getSaveData().stars).toBe(38);
+
+    expect(rt.enchantRelic('eq-holy-relic')).toBe(true);
+    expect(rt.getSaveData().relicEnchants['eq-holy-relic']).not.toBe(first);
+
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(997, meadow, regs);
+    const baseHp = session.player.maxHp;
+    const upg = new UpgradeSystem();
+    upg.applyMetaTalents(
+      session,
+      {
+        might: 0,
+        vitality: 0,
+        swiftness: 0,
+        greed: 0,
+        haste: 0,
+        magnet: 0,
+        dice: 0,
+        bossSlayer: 0,
+      },
+      undefined,
+      ['eq-holy-relic', 'eq-vampiric-chalice'],
+      {},
+      {},
+      { 'eq-holy-relic': 'ferocity' }
+    );
+    expect(session.player.directModifiers.damageBonus).toBeCloseTo(0.06 + 0.08, 5);
+    expect(session.player.maxHp).toBe(baseHp + 20);
+    session.dispose();
+  });
+
+  it('computes pre-run build preview matching talents, stars, gems, enchants, and resonance', () => {
+    const regs = createDefaultRegistries();
+    const hero = regs.characters.getOrThrow('storm-ranger');
+    const rt = new GameRuntime();
+    const save = (rt as unknown as { saveData: ReturnType<GameRuntime['getSaveData']> }).saveData;
+    save.talents.vitality = 2; // +36 HP
+    save.talents.might = 1; // +6% DMG
+    save.talents.dice = 2; // 4 rerolls
+    save.characterStars['storm-ranger'] = 2; // +12 HP, +5% DMG, +3% Crit
+    save.loadoutRelicIds.push('eq-holy-relic', 'eq-vampiric-chalice'); // Rare+ resonance: +8% DMG, +20 HP
+    save.relicSockets['eq-holy-relic'] = 'ruby:1'; // +4% DMG
+    save.relicEnchants['eq-holy-relic'] = 'keen'; // +5% Crit
+
+    const preview = computePreRunPreviewStats(hero, save, regs.equipment.list());
+    expect(preview.maxHp).toBe(hero.baseHp + 36 + 12 + 20);
+    expect(preview.damageBonusPct).toBe(6 + 5 + 8 + 4);
+    expect(preview.critChancePct).toBe(8 + 3 + 5);
+    expect(preview.rerolls).toBe(4);
+    expect(preview.resonanceActive).toBe(true);
+  });
+
+  it('grants Endless Limit Break scaling on endless boss kill and stat-heal-fallback', () => {
+    const regs = createDefaultRegistries();
+    const astral = regs.levels.getOrThrow('astral-throne');
+    const session = new GameSession(998, astral, regs);
+    const prog = new LevelProgressionSystem();
+    const combat = new CombatSystem();
+    const upg = new UpgradeSystem();
+
+    session.endlessMode = true;
+    session.bossSpawned = true;
+    session.bossKilled = true;
+    const baseDmgBonus = session.player.directModifiers.damageBonus;
+    const baseMaxHp = session.player.maxHp;
+
+    prog.update(session, 0.016, combat, null);
+    expect(session.endlessBossKills).toBe(1);
+    expect(session.player.directModifiers.damageBonus).toBeCloseTo(baseDmgBonus + 0.14, 5);
+    expect(session.player.maxHp).toBe(baseMaxHp + 15);
+
+    expect(upg.applyUpgrade(session, 'stat-heal-fallback')).toBe(true);
+    expect(session.player.directModifiers.damageBonus).toBeCloseTo(baseDmgBonus + 0.2, 5);
+    expect(session.player.maxHp).toBe(baseMaxHp + 25);
     session.dispose();
   });
 });

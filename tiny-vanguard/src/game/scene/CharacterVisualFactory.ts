@@ -169,10 +169,18 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   shadowDisc.position.y = 0.02;
   root.add(shadowDisc);
 
+  const isRanger = def.id === 'storm-ranger';
+  const isBastion = def.id === 'iron-bastion';
+  if (isBastion) {
+    root.scale.setScalar(1.08);
+  }
+
   const heroRingGeo = new THREE.RingGeometry(0.68, 0.78, 36);
   heroRingGeo.rotateX(-Math.PI / 2);
+  const energyHex = isRanger ? 0xa855f7 : isBastion ? 0xf97316 : 0x38bdf8;
+  const armorBaseHex = isRanger ? 0xbae6fd : isBastion ? 0x64748b : 0xe2e8f0;
   const heroRingMat = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8,
+    color: energyHex,
     transparent: true,
     opacity: 0.65,
     blending: THREE.AdditiveBlending,
@@ -185,41 +193,41 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   // High-contrast metallic PBR materials with Fresnel Rim lighting
   const armorMat = applyFresnelRim(
     new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
-      roughness: 0.26,
-      metalness: 0.82,
+      color: armorBaseHex,
+      roughness: isBastion ? 0.36 : 0.24,
+      metalness: isBastion ? 0.88 : 0.8,
     }),
-    0x7dd3fc,
+    energyHex,
     2.4,
     0.72
   );
   const darkFrameMat = applyFresnelRim(
     new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
+      color: isRanger ? 0x0f172a : 0x1e293b,
       roughness: 0.42,
       metalness: 0.72,
     }),
-    0x38bdf8,
+    energyHex,
     2.8,
     0.45
   );
   const goldTrimMat = applyFresnelRim(
     new THREE.MeshStandardMaterial({
       color: def.primaryColor,
-      emissive: 0x78350f,
+      emissive: isBastion ? 0x9a3412 : isRanger ? 0x0369a1 : 0x78350f,
       emissiveIntensity: 0.28,
       roughness: 0.22,
       metalness: 0.88,
     }),
-    0xfde047,
+    def.primaryColor,
     2.2,
     0.55
   );
   const reactorMat = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8,
+    color: energyHex,
   });
   const thrusterMat = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8,
+    color: energyHex,
     transparent: true,
     opacity: 0.88,
     side: THREE.DoubleSide,
@@ -227,8 +235,13 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
     depthWrite: false,
   });
 
-  // 1. V-Tapered Angular Armored Torso (elevated for 3.5-head athletic proportion)
-  const torsoGeo = new THREE.CylinderGeometry(0.36, 0.24, 0.64, 6);
+  // 1. V-Tapered Angular Armored Torso (tailored silhouette per archetype)
+  const torsoGeo = new THREE.CylinderGeometry(
+    isRanger ? 0.3 : isBastion ? 0.44 : 0.36,
+    isRanger ? 0.2 : isBastion ? 0.32 : 0.24,
+    0.64,
+    6
+  );
   const body = new THREE.Mesh(torsoGeo, armorMat);
   body.position.y = 0.82;
   body.castShadow = true;
@@ -268,19 +281,26 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   beltBuckle.position.set(0, 0, 0.24);
   waist.add(beltBuckle);
 
-  // 2. Swept Angular Heavy Mecha-Knight Shoulder Pauldrons
-  const pauldronGeo = new THREE.BoxGeometry(0.34, 0.28, 0.4);
+  // 2. Shoulder Pauldrons (Sleek Ranger fins vs Knight vs Heavy Bastion fortress plates)
+  const pauldronGeo = new THREE.BoxGeometry(
+    isRanger ? 0.24 : isBastion ? 0.46 : 0.34,
+    isRanger ? 0.2 : isBastion ? 0.34 : 0.28,
+    isRanger ? 0.3 : isBastion ? 0.48 : 0.4
+  );
   for (const side of [-1, 1]) {
     const pGroup = new THREE.Group();
-    pGroup.position.set(side * 0.42, 0.22, 0);
-    pGroup.rotation.z = -side * 0.32;
+    pGroup.position.set(side * (isRanger ? 0.36 : isBastion ? 0.5 : 0.42), 0.22, 0);
+    pGroup.rotation.z = -side * (isRanger ? 0.48 : isBastion ? 0.16 : 0.32);
 
     const pMain = new THREE.Mesh(pauldronGeo, armorMat);
     pMain.castShadow = true;
     pGroup.add(pMain);
 
-    const pTrim = new THREE.Mesh(new THREE.BoxGeometry(0.37, 0.06, 0.43), goldTrimMat);
-    pTrim.position.y = 0.12;
+    const pTrim = new THREE.Mesh(
+      new THREE.BoxGeometry(isBastion ? 0.48 : 0.37, 0.06, isBastion ? 0.5 : 0.43),
+      goldTrimMat
+    );
+    pTrim.position.y = isBastion ? 0.16 : 0.12;
     pGroup.add(pTrim);
 
     const pVent = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.44), reactorMat);
@@ -290,13 +310,17 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
     body.add(pGroup);
   }
 
-  // 3. Angular Tactical Knight-Mech Helmet (NO round sphere head)
+  // 3. Archetype-Distinct Headgear (Knight Crest / Ranger Hood+Antennas / Bastion Heavy Visor)
   const helmGroup = new THREE.Group();
   helmGroup.position.set(0, 0.56, 0.02);
   body.add(helmGroup);
 
-  const helmCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 1), armorMat);
-  helmCore.scale.set(0.92, 1.08, 1.06);
+  const helmCore = isBastion
+    ? new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.46, 0.48), armorMat)
+    : new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 1), armorMat);
+  if (!isBastion) {
+    helmCore.scale.set(isRanger ? 0.86 : 0.92, isRanger ? 1.04 : 1.08, isRanger ? 1.12 : 1.06);
+  }
   helmCore.castShadow = true;
   helmGroup.add(helmCore);
 
@@ -304,7 +328,6 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   jawGuard.position.set(0, -0.15, 0.06);
   helmGroup.add(jawGuard);
 
-  // Glowing cyan V-visor slit
   const visorMask = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.11, 0.14), darkFrameMat);
   visorMask.position.set(0, -0.02, 0.24);
   helmGroup.add(visorMask);
@@ -313,7 +336,6 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   visorGlow.position.set(0, -0.02, 0.3);
   helmGroup.add(visorGlow);
 
-  // Swept metallic crest fins & glowing crimson command fin
   const finMat = new THREE.MeshStandardMaterial({
     color: def.accentColor,
     emissive: def.accentColor,
@@ -321,23 +343,52 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
     roughness: 0.28,
     metalness: 0.5,
   });
-  const crestMain = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.46), goldTrimMat);
-  crestMain.position.set(0, 0.24, -0.04);
-  crestMain.rotation.x = -0.25;
-  helmGroup.add(crestMain);
 
-  const crestPlume = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 4), finMat);
-  crestPlume.position.set(0, 0.32, -0.22);
-  crestPlume.rotation.x = -0.95;
-  helmGroup.add(crestPlume);
+  if (isRanger) {
+    // Sleek twin swept ear-antennas + pointed hood tail
+    for (const side of [-1, 1]) {
+      const earFin = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.34, 4), finMat);
+      earFin.position.set(side * 0.26, 0.18, -0.08);
+      earFin.rotation.set(-0.75, 0, -side * 0.35);
+      helmGroup.add(earFin);
+    }
+    const hoodTip = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.36, 4), goldTrimMat);
+    hoodTip.position.set(0, 0.22, -0.2);
+    hoodTip.rotation.x = -1.05;
+    helmGroup.add(hoodTip);
+  } else if (isBastion) {
+    // Heavy twin brow horns + armored top plate
+    const browPlate = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.1, 0.52), goldTrimMat);
+    browPlate.position.set(0, 0.24, 0.02);
+    helmGroup.add(browPlate);
+    for (const side of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.22, 0.14), finMat);
+      horn.position.set(side * 0.24, 0.28, 0.18);
+      horn.rotation.z = -side * 0.2;
+      helmGroup.add(horn);
+    }
+  } else {
+    const crestMain = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.46), goldTrimMat);
+    crestMain.position.set(0, 0.24, -0.04);
+    crestMain.rotation.x = -0.25;
+    helmGroup.add(crestMain);
 
-  // 4. Twin Back Energy Thruster Wings (replaces flat rectangular cape)
+    const crestPlume = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 4), finMat);
+    crestPlume.position.set(0, 0.32, -0.22);
+    crestPlume.rotation.x = -0.95;
+    helmGroup.add(crestPlume);
+  }
+
+  // 4. Back Energy Thruster Wings (4-wing storm array for Ranger, heavy thruster pack for Bastion)
   const wingRack = new THREE.Group();
   wingRack.position.set(0, 0.18, -0.26);
-  const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.18), darkFrameMat);
+  const backpack = new THREE.Mesh(
+    new THREE.BoxGeometry(isBastion ? 0.46 : 0.36, 0.36, isBastion ? 0.24 : 0.18),
+    darkFrameMat
+  );
   wingRack.add(backpack);
 
-  const wingBladeGeo = new THREE.ConeGeometry(0.14, 0.92, 4);
+  const wingBladeGeo = new THREE.ConeGeometry(0.14, isRanger ? 1.1 : 0.92, 4);
   wingBladeGeo.scale(0.35, 1, 1.3);
   for (const side of [-1, 1]) {
     const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.34, 0.12), goldTrimMat);
@@ -346,41 +397,80 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
     wingRack.add(pylon);
 
     const energyWing = new THREE.Mesh(wingBladeGeo, thrusterMat);
-    energyWing.position.set(side * 0.54, 0.12, -0.2);
+    energyWing.position.set(side * (isRanger ? 0.62 : 0.54), 0.12, -0.2);
     energyWing.rotation.set(-0.55, side * 0.22, -side * 0.82);
     wingRack.add(energyWing);
+
+    if (isRanger) {
+      const subWing = new THREE.Mesh(wingBladeGeo, thrusterMat);
+      subWing.scale.setScalar(0.72);
+      subWing.position.set(side * 0.46, -0.08, -0.18);
+      subWing.rotation.set(-0.45, side * 0.18, -side * 1.15);
+      wingRack.add(subWing);
+    }
   }
   body.add(wingRack);
 
-  // 5. Left Arm: Hexagonal Energy Buckler Shield
+  // 5. Left Arm: Ranger Twin Energy Dagger / Bastion Tower Shield / Knight Hex Buckler
   const shieldHolder = new THREE.Group();
-  shieldHolder.position.set(-0.48, -0.04, 0.16);
-  const hexFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.07, 6), darkFrameMat);
-  hexFrame.rotation.x = Math.PI / 2;
-  hexFrame.castShadow = true;
-  shieldHolder.add(hexFrame);
+  shieldHolder.position.set(isBastion ? -0.56 : -0.48, -0.04, 0.16);
+  if (isRanger) {
+    // Sleek off-hand storm blade instead of heavy shield
+    const offHilt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.26), darkFrameMat);
+    shieldHolder.add(offHilt);
+    const offBlade = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.03, 0.72),
+      new THREE.MeshStandardMaterial({
+        color: 0xf3e8ff,
+        emissive: 0xa855f7,
+        emissiveIntensity: 1.4,
+        roughness: 0.15,
+        metalness: 0.9,
+      })
+    );
+    offBlade.position.set(0, 0, 0.42);
+    shieldHolder.add(offBlade);
+  } else if (isBastion) {
+    // Heavy rectangular fortress tower shield
+    const towerBody = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.88, 0.11), darkFrameMat);
+    towerBody.castShadow = true;
+    shieldHolder.add(towerBody);
+    const towerTrim = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.94, 0.06), goldTrimMat);
+    towerTrim.position.z = -0.01;
+    shieldHolder.add(towerTrim);
+    const towerCore = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.56, 0.13),
+      new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.82 })
+    );
+    shieldHolder.add(towerCore);
+  } else {
+    const hexFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.07, 6), darkFrameMat);
+    hexFrame.rotation.x = Math.PI / 2;
+    hexFrame.castShadow = true;
+    shieldHolder.add(hexFrame);
 
-  const hexEnergy = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.28, 0.28, 0.08, 6),
-    new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.78,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  hexEnergy.rotation.x = Math.PI / 2;
-  shieldHolder.add(hexEnergy);
+    const hexEnergy = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.28, 0.08, 6),
+      new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.78,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    hexEnergy.rotation.x = Math.PI / 2;
+    shieldHolder.add(hexEnergy);
 
-  const hexRim = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.032, 6, 6), goldTrimMat);
-  hexRim.position.z = 0.03;
-  shieldHolder.add(hexRim);
+    const hexRim = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.032, 6, 6), goldTrimMat);
+    hexRim.position.z = 0.03;
+    shieldHolder.add(hexRim);
+  }
   body.add(shieldHolder);
 
-  // 6. Right Arm: Glowing Plasma Greatsword
+  // 6. Right Arm: Ranger Pulse Blade / Bastion Siege Hammer / Knight Plasma Greatsword
   const weaponPivot = new THREE.Group();
-  weaponPivot.position.set(0.48, 0.78, 0.14);
+  weaponPivot.position.set(isBastion ? 0.56 : 0.48, 0.78, 0.14);
 
   const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.26, 6), darkFrameMat);
   hilt.rotation.x = Math.PI * 0.45;
@@ -390,35 +480,78 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   guard.position.set(0, 0.04, 0.14);
   weaponPivot.add(guard);
 
-  const bladeCore = new THREE.Mesh(
-    new THREE.BoxGeometry(0.1, 0.036, 1.05),
-    new THREE.MeshStandardMaterial({
-      color: 0xe0f2fe,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 1.45,
-      roughness: 0.12,
-      metalness: 0.9,
-    })
-  );
-  bladeCore.position.set(0, 0.06, 0.68);
-  bladeCore.castShadow = true;
-  weaponPivot.add(bladeCore);
+  let bladeGlow: THREE.Mesh;
+  if (isBastion) {
+    // Heavy Siege Hammer
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.92, 6), darkFrameMat);
+    shaft.rotation.x = Math.PI * 0.5;
+    shaft.position.set(0, 0.05, 0.52);
+    weaponPivot.add(shaft);
 
-  const bladeGlow = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.36, 1.2),
-    new THREE.MeshBasicMaterial({
-      map: getVfxGlowTexture(),
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.72,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  bladeGlow.rotation.x = -Math.PI / 2;
-  bladeGlow.position.set(0, 0.07, 0.7);
-  weaponPivot.add(bladeGlow);
+    const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.34), armorMat);
+    hammerHead.position.set(0, 0.06, 0.92);
+    hammerHead.castShadow = true;
+    weaponPivot.add(hammerHead);
+
+    const hammerCore = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.18, 0.18),
+      new THREE.MeshStandardMaterial({
+        color: 0xffedd5,
+        emissive: 0xf97316,
+        emissiveIntensity: 1.5,
+        roughness: 0.2,
+        metalness: 0.7,
+      })
+    );
+    hammerCore.position.set(0, 0.06, 0.92);
+    weaponPivot.add(hammerCore);
+
+    bladeGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 0.6),
+      new THREE.MeshBasicMaterial({
+        map: getVfxGlowTexture(),
+        color: 0xf97316,
+        transparent: true,
+        opacity: 0.72,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    bladeGlow.rotation.x = -Math.PI / 2;
+    bladeGlow.position.set(0, 0.07, 0.92);
+    weaponPivot.add(bladeGlow);
+  } else {
+    const bladeCore = new THREE.Mesh(
+      new THREE.BoxGeometry(isRanger ? 0.07 : 0.1, 0.036, isRanger ? 0.84 : 1.05),
+      new THREE.MeshStandardMaterial({
+        color: isRanger ? 0xf3e8ff : 0xe0f2fe,
+        emissive: energyHex,
+        emissiveIntensity: 1.45,
+        roughness: 0.12,
+        metalness: 0.9,
+      })
+    );
+    bladeCore.position.set(0, 0.06, isRanger ? 0.56 : 0.68);
+    bladeCore.castShadow = true;
+    weaponPivot.add(bladeCore);
+
+    bladeGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.36, isRanger ? 0.96 : 1.2),
+      new THREE.MeshBasicMaterial({
+        map: getVfxGlowTexture(),
+        color: energyHex,
+        transparent: true,
+        opacity: 0.72,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    bladeGlow.rotation.x = -Math.PI / 2;
+    bladeGlow.position.set(0, 0.07, isRanger ? 0.58 : 0.7);
+    weaponPivot.add(bladeGlow);
+  }
   root.add(weaponPivot);
 
   // 7. Articulated Armored Legs / Greaves
@@ -584,6 +717,8 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
 };
 
 registerCharacterVisual('chibi-knight', defaultChibiCharacterBuilder);
+registerCharacterVisual('storm-ranger', defaultChibiCharacterBuilder);
+registerCharacterVisual('iron-bastion', defaultChibiCharacterBuilder);
 
 export function createCharacterVisual(def: CharacterDefinition): CharacterVisualInstance {
   const builder = builders.get(def.id) ?? defaultChibiCharacterBuilder;

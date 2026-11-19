@@ -11,17 +11,20 @@ export function createObstacleProp(obs: ObstacleConfig): THREE.Group {
   const group = new THREE.Group();
   group.position.set(obs.x, 0, obs.z);
 
-  const isDarkStone = ((obs.color >> 16) & 0xff) < 0x55;
-  const runeHex = isDarkStone ? 0xf97316 : 0x38bdf8;
-  const runeEmissive = isDarkStone ? 0xea580c : 0x0284c7;
+  const r = (obs.color >> 16) & 0xff;
+  const b = obs.color & 0xff;
+  const isVoidStone = b > r * 1.15 && r < 0x50;
+  const isDarkStone = !isVoidStone && r < 0x55;
+  const runeHex = isVoidStone ? 0xc084fc : isDarkStone ? 0xf97316 : 0x38bdf8;
+  const runeEmissive = isVoidStone ? 0x9333ea : isDarkStone ? 0xea580c : 0x0284c7;
 
   const stoneMat = new THREE.MeshStandardMaterial({
-    color: isDarkStone ? 0x292524 : 0x475569,
+    color: isVoidStone ? 0x2e1f47 : isDarkStone ? 0x292524 : 0x475569,
     roughness: 0.78,
     metalness: 0.22,
   });
   const trimMat = new THREE.MeshStandardMaterial({
-    color: isDarkStone ? 0x44403c : 0x64748b,
+    color: isVoidStone ? 0x4c1d95 : isDarkStone ? 0x44403c : 0x64748b,
     roughness: 0.52,
     metalness: 0.45,
   });
@@ -761,8 +764,8 @@ export function createBridgeArenaGroup(cfg: BridgeConfig): THREE.Group {
   defLine.position.set(0, 0.03, cfg.defenseLineZ);
   group.add(defLine);
 
-  // Hero Tactical Defense Bay (subtle floor tint + clear cyan front boundary line so no invisible wall)
-  const bayDepth = 3.3;
+  // Hero Tactical Defense Bay (4.8m depth so Dash & Orbit Shields fit cleanly inside visible cyan boundary)
+  const bayDepth = 4.8;
   const bayGeo = new THREE.PlaneGeometry(width - 0.65, bayDepth);
   bayGeo.rotateX(-Math.PI / 2);
   const bayMat = new THREE.MeshBasicMaterial({

@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { EQUIPMENT_DEFS } from '../../game/content/equipment/equipment';
+import { getRelicIcon } from '../../game/content/icons/itemIcons';
 import type { HudSnapshot } from '../../game/core/GameTypes';
+import WeaponSvgIcon from '../common/WeaponSvgIcon.vue';
 import { useI18n } from './useI18n';
 
 const props = defineProps<{
@@ -13,9 +16,20 @@ const emit = defineEmits<{
   (e: 'dash'): void;
   (e: 'guard'): void;
   (e: 'fury'): void;
+  (e: 'attack'): void;
 }>();
 
-const { t, tc, formatTime } = useI18n();
+const { lang, t, tc, formatTime } = useI18n();
+const relicDrawerOpen = ref(false);
+const EQUIPMENT_MAP = new Map(EQUIPMENT_DEFS.map((e) => [e.id, e]));
+
+function relicTooltip(rid: string): string {
+  const def = EQUIPMENT_MAP.get(rid);
+  if (!def) return rid;
+  return lang.value === 'en'
+    ? `${def.nameEn}: ${def.descriptionEn}`
+    : `${def.name}：${def.description}`;
+}
 
 const hpPct = computed(() =>
   Math.max(0, Math.min(100, (props.hud.hp / Math.max(1, props.hud.maxHp)) * 100))
@@ -48,21 +62,12 @@ const supplyArrowAngle = computed(() => {
   return (Math.atan2(props.hud.supply.dirX, -props.hud.supply.dirZ) * 180) / Math.PI;
 });
 
-const WEAPON_ICONS: Record<string, string> = {
-  'star-blaster': '✨',
-  'orbit-shields': '🛡️',
-  'frost-nova': '❄️',
-  'thunder-arc': '⚡',
-  'rail-sniper': '🎯',
-};
-
-function weaponIcon(weaponId: string): string {
-  return WEAPON_ICONS[weaponId] ?? '⚔️';
-}
+const visibleRelicIds = computed(() => props.hud.relicIds.slice(-6));
+const extraRelicCount = computed(() => Math.max(0, props.hud.relicIds.length - 6));
 
 const RING_CIRCUMFERENCE = 175.93;
 
-type ActiveSkillId = 'dash' | 'guard' | 'fury';
+type ActiveSkillId = 'attack' | 'dash' | 'guard' | 'fury';
 interface ArcSkillItem {
   id: ActiveSkillId;
   cls: string;
@@ -76,6 +81,17 @@ interface ArcSkillItem {
 }
 
 const arcSkills = computed<ArcSkillItem[]>(() => [
+  {
+    id: 'attack',
+    cls: 'attack-btn primary-skill-btn',
+    icon: '⚔️',
+    label: t('hud.attack'),
+    keyLabel: 'J',
+    ratio: props.hud.attackReadyRatio,
+    ready: props.hud.attackReadyRatio >= 0.99,
+    disabled: false,
+    style: { '--ux': '0', '--uy': '0', '--arc-spread': '0px' },
+  },
   {
     id: 'dash',
     cls: 'dash-btn',
@@ -112,20 +128,21 @@ const arcSkills = computed<ArcSkillItem[]>(() => [
 ]);
 
 function getArcSlotStyle(idx: number, count: number): Record<string, string> {
-  const startDeg = 168;
-  const endDeg = 92;
+  const startDeg = 174;
+  const endDeg = 86;
   const deg = count <= 1 ? 130 : startDeg - (idx / (count - 1)) * (startDeg - endDeg);
   const rad = (deg * Math.PI) / 180;
   return {
     '--ux': (-Math.cos(rad)).toFixed(4),
     '--uy': Math.sin(rad).toFixed(4),
-    '--arc-spread': count > 3 ? `${(count - 3) * 18}px` : '0px',
+    '--arc-spread': count > 3 ? `${(count - 3) * 16}px` : '0px',
   };
 }
 
 let lastSkillTapAt = 0;
 function emitSkill(kind: ActiveSkillId) {
-  if (kind === 'fury') emit('fury');
+  if (kind === 'attack') emit('attack');
+  else if (kind === 'fury') emit('fury');
   else if (kind === 'guard') emit('guard');
   else emit('dash');
 }
@@ -168,7 +185,7 @@ function triggerSkillTap(kind: ActiveSkillId) {
             :class="{ empty: !hud.weaponSlots[idx - 1], evolved: hud.weaponSlots[idx - 1]?.isEvolved }"
           >
             <template v-if="hud.weaponSlots[idx - 1]">
-              <span class="w-icon">{{ weaponIcon(hud.weaponSlots[idx - 1].weaponId) }}</span>
+              <WeaponSvgIcon :weapon-id="hud.weaponSlots[idx - 1].weaponId" :size="15" />
               <span class="w-name">{{ tc(hud.weaponSlots[idx - 1].weaponId, 'name', hud.weaponSlots[idx - 1].name) }}</span>
               <span v-if="hud.weaponSlots[idx - 1].level > 1" class="w-lv">Lv.{{ hud.weaponSlots[idx - 1].level }}</span>
               <span v-if="hud.weaponSlots[idx - 1].isEvolved" class="w-evo">★</span>
@@ -216,12 +233,30 @@ function triggerSkillTap(kind: ActiveSkillId) {
 
       <!-- Top Right: Relics + Combo + Kills + Pause -->
       <div class="hud-right">
-        <div
+        <button
           v-if="hud.relicCount > 0"
-          class="relic-pill"
+          type="button"
+          class="relic-pill relic-pill-btn"
           :class="{ 'tier-epic': hud.relicCount >= 5 && hud.relicCount < 12, 'tier-mythic': hud.relicCount >= 12 }"
+          @click="relicDrawerOpen = !relicDrawerOpen"
         >
-          🏅 {{ t('hud.relics', { count: hud.relicCount }) }}
+          <span class="relic-icons-row">
+            <span
+              v-for="rid in visibleRelicIds"
+              :key="rid"
+              class="relic-mini-icon"
+              :title="relicTooltip(rid)"
+            >{{ getRelicIcon(rid) }}</span>
+            <span v-if="extraRelicCount > 0" class="relic-extra">+{{ extraRelicCount }}</span>
+          </span>
+          <span>{{ t('hud.relics', { count: hud.relicCount }) }}</span>
+        </button>
+
+        <div v-if="relicDrawerOpen && hud.relicCount > 0" class="relic-popover" @click="relicDrawerOpen = false">
+          <div v-for="rid in hud.relicIds" :key="rid" class="relic-pop-row">
+            <span class="relic-pop-icon">{{ getRelicIcon(rid) }}</span>
+            <span class="relic-pop-text">{{ relicTooltip(rid) }}</span>
+          </div>
         </div>
         <div
           v-if="hud.combo >= 3"
@@ -237,13 +272,8 @@ function triggerSkillTap(kind: ActiveSkillId) {
       </div>
     </div>
 
-    <!-- Bottom Right: Honor-of-Kings Style Radial Fan Arc Skill Wheel -->
+    <!-- Bottom Right: Primary Dash Anchor + Radial Fan Arc Active Skills -->
     <div class="moba-skill-cluster">
-      <div class="core-anchor-emblem" aria-hidden="true">
-        <span class="core-anchor-ring"></span>
-        <span class="core-anchor-icon">⚔️</span>
-      </div>
-
       <button
         v-for="skill in arcSkills"
         :key="skill.id"
@@ -413,6 +443,15 @@ function triggerSkillTap(kind: ActiveSkillId) {
   border: 1px solid rgba(239, 71, 111, 0.52);
   border-radius: 10px;
   padding: 4px 10px;
+  animation: bossArrivePulse 0.6s ease-in-out 3;
+}
+@keyframes bossArrivePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(239, 71, 111, 0);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(239, 71, 111, 0.68);
+  }
 }
 .boss-header {
   display: flex;
@@ -449,9 +488,64 @@ function triggerSkillTap(kind: ActiveSkillId) {
   color: #80ffdb;
 }
 .hud-right {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.relic-pill-btn {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.relic-popover {
+  pointer-events: auto;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: min(300px, 84vw);
+  max-height: 44vh;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 30;
+}
+.relic-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #e2e8f0;
+  line-height: 1.3;
+}
+.relic-pop-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.relic-pop-text {
+  min-width: 0;
+}
+.relic-icons-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+.relic-mini-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.relic-extra {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fde047;
+  margin-left: 2px;
 }
 .kills-pill {
   background: rgba(15, 23, 42, 0.72);
@@ -522,46 +616,27 @@ function triggerSkillTap(kind: ActiveSkillId) {
   gap: 5px;
 }
 .moba-skill-cluster {
-  --anchor-c: 44px;
-  --arc-r: 108px;
-  --skill-sz: 62px;
+  --anchor-x: 68px;
+  --anchor-y: 100px;
+  --arc-r: 112px;
+  --skill-sz: 58px;
   position: fixed;
   right: env(safe-area-inset-right, 0px);
   bottom: env(safe-area-inset-bottom, 0px);
-  width: 220px;
-  height: 220px;
+  width: 240px;
+  height: 240px;
   pointer-events: none;
   z-index: 12;
 }
-.core-anchor-emblem {
-  position: absolute;
-  right: var(--anchor-c);
-  bottom: var(--anchor-c);
-  width: 64px;
-  height: 64px;
-  transform: translate(50%, 50%);
-  border-radius: 50%;
-  border: 2px solid rgba(92, 232, 255, 0.52);
-  background: radial-gradient(circle at 38% 35%, rgba(28, 62, 92, 0.88), rgba(10, 18, 32, 0.94));
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.25), inset 0 0 12px rgba(92, 232, 255, 0.2);
-  display: grid;
-  place-items: center;
-}
-.core-anchor-ring {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 1px dashed rgba(92, 232, 255, 0.34);
-}
-.core-anchor-icon {
-  font-size: 24px;
-  filter: drop-shadow(0 2px 6px rgba(56, 189, 248, 0.65));
+.primary-skill-btn {
+  width: calc(var(--skill-sz) + 14px);
+  height: calc(var(--skill-sz) + 14px);
 }
 .skill-btn {
   pointer-events: auto;
   position: absolute;
-  right: calc(var(--anchor-c) + var(--ux, 0) * (var(--arc-r) + var(--arc-spread, 0px)));
-  bottom: calc(var(--anchor-c) + var(--uy, 0) * (var(--arc-r) + var(--arc-spread, 0px)));
+  right: calc(var(--anchor-x) + var(--ux, 0) * (var(--arc-r) + var(--arc-spread, 0px)));
+  bottom: calc(var(--anchor-y) + var(--uy, 0) * (var(--arc-r) + var(--arc-spread, 0px)));
   transform: translate(50%, 50%);
   width: var(--skill-sz);
   height: var(--skill-sz);
@@ -708,6 +783,15 @@ function triggerSkillTap(kind: ActiveSkillId) {
 .weapon-slot.evolved .w-cd-bar {
   background: linear-gradient(90deg, #fbbf24, #f59e0b);
 }
+@media (max-width: 1024px) {
+  .moba-skill-cluster {
+    --anchor-x: 62px;
+    --anchor-y: 81px;
+    --arc-r: 86px;
+    --skill-sz: 50px;
+    bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
 @media (max-width: 640px) {
   .hud-top {
     grid-template-columns: minmax(152px, 1fr) auto;
@@ -740,6 +824,9 @@ function triggerSkillTap(kind: ActiveSkillId) {
     padding: 4px 8px;
     font-size: 11px;
   }
+  .relic-icons-row {
+    display: none;
+  }
   .pause-btn {
     width: 32px;
     height: 32px;
@@ -770,16 +857,11 @@ function triggerSkillTap(kind: ActiveSkillId) {
     padding: 0 4px;
   }
   .moba-skill-cluster {
-    --anchor-c: 38px;
-    --arc-r: 96px;
-    --skill-sz: 54px;
-  }
-  .core-anchor-emblem {
-    width: 56px;
-    height: 56px;
-  }
-  .core-anchor-icon {
-    font-size: 20px;
+    --anchor-x: 56px;
+    --anchor-y: 79px;
+    --arc-r: 78px;
+    --skill-sz: 46px;
+    bottom: env(safe-area-inset-bottom, 0px);
   }
   .skill-icon {
     font-size: 15px;
@@ -805,16 +887,11 @@ function triggerSkillTap(kind: ActiveSkillId) {
     font-size: 12px;
   }
   .moba-skill-cluster {
-    --anchor-c: 34px;
-    --arc-r: 82px;
-    --skill-sz: 48px;
-  }
-  .core-anchor-emblem {
-    width: 50px;
-    height: 50px;
-  }
-  .core-anchor-icon {
-    font-size: 18px;
+    --anchor-x: 52px;
+    --anchor-y: 60px;
+    --arc-r: 74px;
+    --skill-sz: 44px;
+    bottom: env(safe-area-inset-bottom, 0px);
   }
   .skill-icon {
     font-size: 14px;

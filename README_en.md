@@ -25,18 +25,22 @@ The standalone build outputs a single self-contained HTML file under `tiny-vangu
 
 ## Features
 
-- **Two Core Modes + Paginated Stage Progression**:
-  - **Wild Survival**: `Verdant Meadow` & `Ember Canyon` (42° 3D action camera, minimum active-enemy floor Wave Director, ring/stampede/escort formation waves, timed holographic Supply Drop Pods, and Titan boss fights).
-  - **Bridge Defense**: `Bridge Defense` & `Frost Bridge` (narrow-lane defense with frameless dual holographic laser gates—break gates, shoot-to-charge tier upgrades, and red corrupted gates you purify by shooting—plus armored Shield Vanguard phalanxes).
+- **Two Core Modes × 8 Progressive Stages + Endless Abyss**:
+  - **Wild Survival**: `Verdant Meadow`, `Ember Canyon`, `Shadow Ruins`, `Astral Throne` (42° 3D action camera, minimum active-enemy floor Wave Director, formation waves, timed Supply Drop Pods, and **Endless Abyss** after Stage 4 Boss with Limit Break scaling and periodic extraction).
+  - **Bridge Defense**: `Bridge Defense`, `Frost Bridge`, `Iron Viaduct`, `Abyss Span` (`4.8m` visible tactical defense bay + dual shoot-to-charge/purify holographic laser gates with 1-of-2 walk-through claim + armored Shield Vanguard phalanxes + **Endless Abyss** after Stage 4 Boss with Limit Break scaling).
+- **Diablo-Style 3-Stage Meta-Progression Loop (4-Tab Armory)**:
+  - **Heroes & Star Progression (1★→5★)**: `Star Vanguard`, `Storm Ranger`, and `Iron Bastion` unlock via shards or Star Medals (legacy victory saves auto-unlock all), scaling HP, damage, and signature passives.
+  - **8 Armory Talents**: Includes `Fate Dice` (+1 starting reroll/rank) and `Regicide Edge` (+8% Elite/Boss DMG/rank).
+  - **5-Tier Relics × Loadout × Refinement × Gem Sockets × Enchanting**: 20 relics across `common`→`legendary` tiers with `+1..+5` Refinement, `15⭐` Sockets for 4×3-tier Gems (3-to-1 fusion & lossless unsocket), `12⭐` Enchanting (6 affixes), 2-slot pre-run loadout, and Rare+ Resonance (`+8% DMG / +20 HP`). Live **Pre-Run Build Summary** in Stage Select.
 - **5 Core Skills × 20 Relics × Super Synergy Awakenings**:
   - Core Skills: `Star Blaster`, `Orbit Shields`, `Frost Nova`, `Thunder Arc` (density-cluster targeting), and `Rail Sniper` (boss/elite/highest-HP targeting).
-  - Content: **20 Debuffs**, **22 Lane Buffs**, **20 Equipment Relics**, **28 Upgrades**, 5 skill-relic Super Synergies, and 25/60/120 Combo Fever tiers with 100-kill arena vacuum blasts.
+  - Content: **20 Debuffs**, **22 Lane Buffs**, **20 Equipment Relics**, **34 Upgrades**, 5 skill-relic Super Synergies, and 25/60/120 Combo Fever tiers with 100-kill arena vacuum blasts.
 - **Zero-Postprocessing GLSL VFX & 3D Hard-Surface Visuals**:
   - Uses **Additive Fake Bloom + Single-Pass GLSL Shaders** (animated ground shockwaves, rotating orbital rune tracks, sky-beacon/starfall pillars, jagged lightning ribbons, piercing sniper lasers, dash afterimages) with zero heavy postprocessing passes;
   - Three-point warm/cool lighting + Fresnel rim shaders + 3.5-head Armored Vanguard + faceted 3D Rift Stalkers, Ravager Beasts, Void Constructs, War Golems, Shield Vanguards, and Dread Titan Bosses + `InstancedMesh` static scene batching.
 - **Dynamic Procedural Music & SFX**: Componentized Web Audio `MusicSequencer` & 3-bus `SoundEngine` that adapt themes and steady `82–114 BPM` grooves across Menu, Wild Survival, Bridge Defense, Boss encounters, and Combo Fever, with independent BGM/SFX toggles.
 - **Bilingual QA Debug Console**: Double-press `F9` within 3 seconds (or `?debug=1`) to toggle the live telemetry & QA console (`1x/2x/4x` speed, God Mode, level jump, all skills/20 relics, gate/formation triggers, Boss jump).
-- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 39 Vitest tests.
+- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 59 Vitest tests.
 
 ## Versions
 
@@ -44,7 +48,7 @@ Full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Version | Date | Contents |
 | --- | --- | --- |
-| 1.0.0 (Overhaul) | 2026-11-18 | Expanded to 2 modes / 4 paginated stages, 5 core skills, 20 Debuffs / 22 Buffs / 20 Relics / 28 Upgrades, Wave Director, shoot-to-charge & red purify laser gates, dynamic procedural BGM/SFX, double-`F9` QA Debug Console, multi-screen adaptation, 3-slot radial skill wheel (`Space`/`E`/`Q`), P0/P1 race & `InstancedMesh` batching fixes, and 3D hard-surface + GLSL VFX overhaul (~`1.017 MiB`). |
+| 1.0.0 (Overhaul) | 2026-11-18 | Expanded to 2 modes / 4 paginated stages, 5 core skills, 20 Debuffs / 22 Buffs / 20 Relics / 28 Upgrades, Wave Director, 1-of-2 walk-through charge/purify laser gates, dynamic procedural BGM/SFX, double-`F9` QA Debug Console, multi-screen adaptation, `⚔️ Attack (J)` + 3-slot radial skill wheel (`Space`/`E`/`Q`), dual-mode Boss balancing, and `InstancedMesh` batching overhaul (~`1.019 MiB`). |
 | 1.0.0 (Initial) | 2026-11-17 | Initial playable release (~`0.653 MiB`). |
 
 ## Play
@@ -72,7 +76,7 @@ npm run gate
 | `npm run dev` | Start Vite dev server |
 | `npm run check` | Run 5 prebuild gates (0 circular imports, security/offline, zero-GC hot loops, content quotas) |
 | `npm run type-check` | Run `vue-tsc --noEmit` |
-| `npm test` | Run 39 Vitest unit & headless simulation tests |
+| `npm test` | Run 59 Vitest unit & headless simulation tests |
 | `npm run build:single` | Build single-file HTML (`dist/`) and sync to `../docs/index.html` |
 | `npm run verify:single` | Verify zero external links, classic script compatibility, isolated copy, and size |
 | `npm run gate` | Run `check` → `type-check` → `test` → `build:single` → `verify:single` |
@@ -81,7 +85,8 @@ npm run gate
 
 | Input | Action |
 | --- | --- |
-| `WASD` | Move (auto-aim & multi-skill combat) |
+| `WASD` / Arrow keys | Move (auto-aim & multi-skill combat) |
+| `J` / Attack button | Manual Star Cleave Burst (runs alongside auto-combat) |
 | `Space` / Dash button | Tactical Dash (brief i-frames + afterimage trail) |
 | `E` / Aegis button | Aegis Guard (grant barrier shield, brief i-frames, knockback & chill) |
 | `Q` / Fury button | Starfall Fury Ultimate (vertical celestial pillar + arena blast) |
@@ -108,7 +113,7 @@ npm run gate
 
 ### Bridge Defense (`Bridge Defense` / `Frost Bridge`)
 
-Defend the chevron barrier line, break or shoot-to-charge dual holographic laser gates (purifying red corrupted gates jumps straight to Lv.2 ×2), equip relics/skills directly on kills, and break Shield Vanguard phalanxes.
+Defend the chevron barrier line within the `4.8m` cyan defense bay, shoot-to-charge or purify dual holographic laser gates (`Lv.1 → Lv.3`, purifying red corrupted gates jumps straight to `Lv.2 ×2`), and walk through your chosen gate for a strict 1-of-2 claim while equipping relics/skills on kills.
 
 <img src="./pic/bridge-defense-01-en.webp" alt="Bridge Defense Stage 1: Bridge Defense" width="960" />
 
@@ -144,7 +149,7 @@ Defend the chevron barrier line, break or shoot-to-charge dual holographic laser
 │   │       ├── session/     GameSession, entity structs & SaveStorage
 │   │       ├── spatial/     Center-outward SpatialGrid
 │   │       ├── systems/     Movement, combat, waves, status, XP & upgrades
-│   │       └── __tests__/   39 Vitest unit & headless simulation tests
+│   │       └── __tests__/   41 Vitest unit & headless simulation tests
 │   └── dist/                tiny-vanguard-<version>-<timestamp>.html
 ├── CHANGELOG.md
 ├── LICENSE

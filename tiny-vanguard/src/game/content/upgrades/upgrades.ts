@@ -38,6 +38,33 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
     weaponId: 'rail-sniper',
     effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'rail-sniper' }],
   },
+  {
+    id: 'unlock-boomerang-axe',
+    name: '解锁：回旋战斧',
+    description: '投掷高穿透重型战斧，横扫密集敌阵并造成强力击退。',
+    category: 'weapon-unlock',
+    maxLevel: 1,
+    weaponId: 'boomerang-axe',
+    effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'boomerang-axe' }],
+  },
+  {
+    id: 'unlock-venom-aura',
+    name: '解锁：毒雾力场',
+    description: '周期释放蚀骨毒雾环，持续灼烧周边敌人并附带剧毒传染。',
+    category: 'weapon-unlock',
+    maxLevel: 1,
+    weaponId: 'venom-aura',
+    effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'venom-aura' }],
+  },
+  {
+    id: 'unlock-seeker-missile',
+    name: '解锁：追踪飞弹',
+    description: '多弹头精准锁定高威胁目标，连续发射微型高爆飞弹。',
+    category: 'weapon-unlock',
+    maxLevel: 1,
+    weaponId: 'seeker-missile',
+    effects: [{ kind: 'unlock-weapon', value: 1, weaponId: 'seeker-missile' }],
+  },
 
   // 4-11: Weapon Upgrades & Mechanism Evolutions
   {
@@ -165,6 +192,42 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
     effects: [
       { kind: 'weapon-mechanism', value: 1, weaponId: 'rail-sniper', mechanismFlag: 'armorBreaker' },
       { kind: 'weapon-cooldown-pct', value: 0.18, weaponId: 'rail-sniper' },
+    ],
+  },
+  {
+    id: 'boomerang-axe-spin',
+    name: '旋风双斧',
+    description: '回旋战斧额外 +1 投掷数量，并提升 22% 战斧伤害。',
+    category: 'weapon-upgrade',
+    maxLevel: 3,
+    weaponId: 'boomerang-axe',
+    effects: [
+      { kind: 'weapon-count-add', value: 1, weaponId: 'boomerang-axe' },
+      { kind: 'weapon-damage-pct', value: 0.22, weaponId: 'boomerang-axe' },
+    ],
+  },
+  {
+    id: 'venom-aura-corrode',
+    name: '蚀骨剧毒',
+    description: '毒雾力场范围扩大 22%，且毒雾伤害提高 28%。',
+    category: 'weapon-upgrade',
+    maxLevel: 3,
+    weaponId: 'venom-aura',
+    effects: [
+      { kind: 'weapon-range-pct', value: 0.22, weaponId: 'venom-aura' },
+      { kind: 'weapon-damage-pct', value: 0.28, weaponId: 'venom-aura' },
+    ],
+  },
+  {
+    id: 'seeker-missile-salvo',
+    name: '蜂群齐射',
+    description: '追踪飞弹每次齐射额外 +1 枚弹头，并缩短 15% 冷却。',
+    category: 'weapon-upgrade',
+    maxLevel: 3,
+    weaponId: 'seeker-missile',
+    effects: [
+      { kind: 'weapon-count-add', value: 1, weaponId: 'seeker-missile' },
+      { kind: 'weapon-cooldown-pct', value: 0.15, weaponId: 'seeker-missile' },
     ],
   },
 

@@ -7,7 +7,7 @@ npm install          # 安装依赖
 npm run dev          # 启动本地开发服务器
 npm run check        # 运行 5 道构建前静默门禁（0 循环依赖、离线红线、零 GC、内容配额）
 npm run type-check   # Vue + TypeScript 严格类型检查
-npm run test         # 运行 Vitest 38 项单元测试与无头战斗模拟
+npm run test         # 运行 Vitest 41 项单元测试与无头战斗模拟
 npm run build        # 标准 Vite 多文件构建 (dist-web/)
 npm run build:single # 构建版本化单文件 HTML (dist/tiny-vanguard-<版本>-<YYYYMMDD-HHmmss>.html) 并同步到 ../docs/index.html
 npm run verify:single# 校验单 HTML 离线纯净度、经典脚本兼容性、<=1.5 MiB 体积与 docs/index.html 一致性

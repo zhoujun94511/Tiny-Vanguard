@@ -129,10 +129,42 @@ export class CombatSystem {
     sound: SoundEngine | null
   ): void {
     this.updateWeapons(session, dt, arena, sound);
+    this.updateBridgeDrones(session, dt);
     this.updatePlayerProjectiles(session, dt, sound);
     this.updateEnemyProjectiles(session, dt, sound);
     this.updateVfx(session, dt);
     this.updateNovaVisuals(dt, arena);
+  }
+
+  private updateBridgeDrones(session: GameSession, dt: number): void {
+    const p = session.player;
+    if (p.bridgeDroneTimer <= 0) return;
+    p.bridgeDroneTimer = Math.max(0, p.bridgeDroneTimer - dt);
+    p.bridgeDroneFireTimer -= dt;
+    if (p.bridgeDroneFireTimer > 0) return;
+
+    p.bridgeDroneFireTimer = Math.max(
+      0.16,
+      0.38 / (p.attackSpeedMult * (0.85 + p.bridgeDronePower * 0.25))
+    );
+    const dmg = 14 * p.damageMult * p.bridgeDronePower;
+    for (let side = -1; side <= 1; side += 2) {
+      this.spawnPlayerProjectile(
+        session,
+        p.x + side * 1.15,
+        p.z - 0.3,
+        0,
+        -24,
+        0.24,
+        dmg,
+        2.5,
+        0.95,
+        1,
+        0x38bdf8,
+        false,
+        false
+      );
+    }
   }
 
   private updateWeapons(
@@ -159,6 +191,12 @@ export class CombatSystem {
         this.updateChainWeapon(session, wState, def, dt, sound);
       } else if (def.behaviorId === 'weapon-sniper-high-hp') {
         this.updateSniperWeapon(session, wState, def, dt, sound);
+      } else if (def.behaviorId === 'weapon-boomerang-axe') {
+        this.updateBoomerangAxeWeapon(session, wState, def, dt, sound);
+      } else if (def.behaviorId === 'weapon-venom-aura') {
+        this.updateVenomAuraWeapon(session, wState, def, dt, sound);
+      } else if (def.behaviorId === 'weapon-seeker-missile') {
+        this.updateSeekerMissileWeapon(session, wState, def, dt, sound);
       }
     }
 
@@ -168,6 +206,141 @@ export class CombatSystem {
       }
       arena.playerVisual.orbitTrackRing.visible = false;
     }
+  }
+
+  private updateBoomerangAxeWeapon(
+    session: GameSession,
+    wState: WeaponRuntimeState,
+    def: WeaponDefinition,
+    dt: number,
+    sound: SoundEngine | null
+  ): void {
+    wState.cooldownTimer -= dt;
+    if (wState.cooldownTimer > 0) return;
+    const p = session.player;
+    const range = def.range * wState.rangeMult;
+    const target = this.findNearestEnemy(session, p.x, p.z, range);
+    if (!target) {
+      wState.cooldownTimer = 0.1;
+      return;
+    }
+
+    const cd = (def.cooldownSec * wState.cooldownMult) / p.attackSpeedMult;
+    wState.cooldownTimer = Math.max(0.25, cd);
+
+    const count = Math.max(1, def.count + wState.bonusCount);
+    const dmg = def.baseDamage * p.damageMult * wState.damageMult;
+    const baseAngle = Math.atan2(target.z - p.z, target.x - p.x);
+
+    for (let i = 0; i < count; i += 1) {
+      const offset = (i - (count - 1) * 0.5) * def.spreadRad;
+      const ang = baseAngle + offset;
+      this.spawnPlayerProjectile(
+        session,
+        p.x,
+        p.z,
+        Math.cos(ang) * def.projectileSpeed,
+        Math.sin(ang) * def.projectileSpeed,
+        def.projectileRadius,
+        dmg,
+        def.knockback,
+        def.projectileLifetimeSec,
+        def.pierce + wState.bonusPierce,
+        def.color,
+        false,
+        false
+      );
+    }
+    sound?.playShoot('axe');
+  }
+
+  private updateVenomAuraWeapon(
+    session: GameSession,
+    wState: WeaponRuntimeState,
+    def: WeaponDefinition,
+    dt: number,
+    sound: SoundEngine | null
+  ): void {
+    wState.cooldownTimer -= dt;
+    if (wState.cooldownTimer > 0) return;
+
+    const p = session.player;
+    const radius = def.range * wState.rangeMult;
+    const radSq = radius * radius;
+    const candidates = this.aoeQueryScratch;
+    session.enemyGrid.queryCircleCandidates(p.x, p.z, radius, candidates, 64);
+    if (candidates.length === 0) {
+      wState.cooldownTimer = 0.12;
+      return;
+    }
+
+    const cd = (def.cooldownSec * wState.cooldownMult) / p.attackSpeedMult;
+    wState.cooldownTimer = Math.max(0.3, cd);
+    const dmg = def.baseDamage * p.damageMult * wState.damageMult;
+
+    let hitAny = false;
+    for (let i = 0; i < candidates.length; i += 1) {
+      const e = session.enemies.getRaw(candidates[i]);
+      if (!e.active || e.hp <= 0) continue;
+      const dx = e.x - p.x;
+      const dz = e.z - p.z;
+      if (dx * dx + dz * dz <= radSq) {
+        hitAny = true;
+        this.statusSys.applyDebuff(e, 'plague-spread');
+        this.damageEnemy(session, e, dmg, 0, 0, sound);
+      }
+    }
+    if (hitAny) {
+      session.spawnShockwave(0, p.x, p.z, 0.4, radius, def.color, 0.36, false);
+      session.spawnVfxBurst(p.x, 0.7, p.z, def.color, 6);
+    }
+  }
+
+  private updateSeekerMissileWeapon(
+    session: GameSession,
+    wState: WeaponRuntimeState,
+    def: WeaponDefinition,
+    dt: number,
+    sound: SoundEngine | null
+  ): void {
+    wState.cooldownTimer -= dt;
+    if (wState.cooldownTimer > 0) return;
+
+    const p = session.player;
+    const range = def.range * wState.rangeMult;
+    const primary = this.findHighestHpEnemy(session, p.x, p.z, range);
+    if (!primary) {
+      wState.cooldownTimer = 0.1;
+      return;
+    }
+
+    const cd = (def.cooldownSec * wState.cooldownMult) / p.attackSpeedMult;
+    wState.cooldownTimer = Math.max(0.22, cd);
+
+    const count = Math.max(1, def.count + wState.bonusCount);
+    const dmg = def.baseDamage * p.damageMult * wState.damageMult;
+    const baseAngle = Math.atan2(primary.z - p.z, primary.x - p.x);
+
+    for (let i = 0; i < count; i += 1) {
+      const spread = (i - (count - 1) * 0.5) * def.spreadRad;
+      const ang = baseAngle + spread;
+      this.spawnPlayerProjectile(
+        session,
+        p.x,
+        p.z,
+        Math.cos(ang) * def.projectileSpeed,
+        Math.sin(ang) * def.projectileSpeed,
+        def.projectileRadius,
+        dmg,
+        def.knockback,
+        def.projectileLifetimeSec,
+        def.pierce + wState.bonusPierce,
+        def.color,
+        false,
+        false
+      );
+    }
+    sound?.playShoot('missile');
   }
 
   private findNearestEnemy(
@@ -292,6 +465,59 @@ export class CombatSystem {
       }
     }
     return best;
+  }
+
+  public static readonly MANUAL_ATTACK_COOLDOWN = 0.65;
+
+  public triggerManualAttack(session: GameSession, sound: SoundEngine | null): boolean {
+    const p = session.player;
+    if (p.attackCooldown > 0) return false;
+    p.attackCooldown = CombatSystem.MANUAL_ATTACK_COOLDOWN / Math.max(0.6, p.attackSpeedMult);
+
+    const range = 14.5;
+    const target = this.findNearestEnemy(session, p.x, p.z, range);
+    let baseAngle =
+      session.level.arenaShape === 'bridge' ? -Math.PI * 0.5 : p.facingRad;
+    if (target) {
+      baseAngle = Math.atan2(target.z - p.z, target.x - p.x);
+    } else if (session.level.arenaShape === 'bridge') {
+      for (let gIdx = 0; gIdx < 2; gIdx += 1) {
+        const g = session.bridgeGates[gIdx];
+        if (g.active && g.z < p.z && p.z - g.z <= range) {
+          baseAngle = Math.atan2(g.z - p.z, g.x - p.x);
+          break;
+        }
+      }
+    }
+
+    const dmg = 16 * p.damageMult;
+    for (let i = -1; i <= 1; i += 1) {
+      const ang = baseAngle + i * 0.14;
+      this.spawnPlayerProjectile(
+        session,
+        p.x,
+        p.z,
+        Math.cos(ang) * 21,
+        Math.sin(ang) * 21,
+        0.3,
+        dmg,
+        3.2,
+        0.85,
+        1,
+        0x9af5ff,
+        false,
+        false
+      );
+    }
+    session.spawnVfxBurst(
+      p.x + Math.cos(baseAngle) * 0.7,
+      0.85,
+      p.z + Math.sin(baseAngle) * 0.7,
+      0x9af5ff,
+      5
+    );
+    sound?.playShoot('blaster');
+    return true;
   }
 
   public triggerAegisGuard(session: GameSession, sound: SoundEngine | null): boolean {
@@ -893,46 +1119,69 @@ export class CombatSystem {
               0.75
             )
           ) {
-            gate.hp -= proj.damage;
+            const canChargeOrPurify = gate.corrupted || gate.chargeTier < gate.maxChargeTier;
+            if (canChargeOrPurify) {
+              gate.hp -= proj.damage;
+            }
             sound?.playGateHit(gate.corrupted);
-            if (gate.gateMode === 'charge') {
-              session.spawnVfxBurst(proj.x, 0.9, gate.z, gate.corrupted ? 0xef4444 : 0xfbbf24, 3);
-              if (gate.hp <= 0) {
-                if (gate.corrupted) {
-                  // Purifying a red corrupted gate leaps straight to Tier 2 (double buff!)
-                  gate.corrupted = false;
-                  gate.chargeTier = 2;
-                  gate.hp = gate.maxHp;
-                  session.spawnVfxBurst(gate.x, 1.35, gate.z, 0xe879f9, 14);
-                  this.enqueueNotice(
-                    translateUi(session.language, 'toast.gatePurified', {
-                      label: session.language === 'en' ? gate.labelEn || gate.label : gate.label,
-                    }),
-                    false
-                  );
-                  sound?.playGatePurify();
-                } else if (gate.chargeTier < gate.maxChargeTier) {
-                  gate.chargeTier += 1;
-                  gate.hp = gate.maxHp;
-                  session.spawnVfxBurst(gate.x, 1.3, gate.z, 0xe879f9, 10);
-                  sound?.playLevelUp();
-                } else {
-                  this.claimChargeGate(session, gate, sound);
-                }
-              }
-            } else {
-              session.spawnVfxBurst(proj.x, 0.9, gate.z, 0x38bdf8, 3);
-              if (gate.hp <= 0) {
-                const localizedLabel = session.language === 'en' ? gate.labelEn || gate.label : gate.label;
-                this.applyGateReward(session, gate.buffId, gate.rewardKind, localizedLabel);
-                session.bridgeGates[0].active = false;
-                session.bridgeGates[1].active = false;
-                sound?.playSupply();
+            session.spawnVfxBurst(proj.x, 0.9, gate.z, gate.corrupted ? 0xef4444 : 0xfbbf24, 3);
+            if (canChargeOrPurify && gate.hp <= 0) {
+              if (gate.corrupted) {
+                // Purifying a red corrupted gate leaps straight to Tier 2 (double buff!)
+                gate.corrupted = false;
+                gate.chargeTier = 2;
+                gate.hp = gate.maxHp;
+                session.spawnVfxBurst(gate.x, 1.35, gate.z, 0xe879f9, 14);
+                this.enqueueNotice(
+                  translateUi(session.language, 'toast.gatePurified', {
+                    label: session.language === 'en' ? gate.labelEn || gate.label : gate.label,
+                  }),
+                  false
+                );
+                sound?.playGatePurify();
+              } else {
+                gate.chargeTier += 1;
+                gate.hp = gate.maxHp;
+                session.spawnVfxBurst(gate.x, 1.3, gate.z, 0xe879f9, 10);
+                sound?.playLevelUp();
               }
             }
             session.playerProjectiles.release(proj);
             return;
           }
+        }
+      }
+
+      // Check shootable Explosive Bridge Barrel (Iron Viaduct)
+      if (session.level.arenaShape === 'bridge' && session.bridgeBarrel.active) {
+        const bar = session.bridgeBarrel;
+        const sumR = proj.radius + bar.radius;
+        if (distSqPointToSegment(bar.x, bar.z, proj.prevX, proj.prevZ, proj.x, proj.z) <= sumR * sumR) {
+          bar.hp -= proj.damage;
+          session.spawnVfxBurst(proj.x, 0.8, bar.z, 0xf97316, 4);
+          if (bar.hp <= 0) {
+            this.detonateBridgeBarrel(session, sound);
+          }
+          session.playerProjectiles.release(proj);
+          return;
+        }
+      }
+
+      // Check shootable Boss Abyss Meteor (Abyss Span)
+      if (session.level.arenaShape === 'bridge' && session.bridgeMeteor.active) {
+        const met = session.bridgeMeteor;
+        const sumR = proj.radius + met.radius;
+        if (distSqPointToSegment(met.x, met.z, proj.prevX, proj.prevZ, proj.x, proj.z) <= sumR * sumR) {
+          met.hp -= proj.damage;
+          session.spawnVfxBurst(proj.x, 1.0, met.z, 0xc084fc, 4);
+          if (met.hp <= 0) {
+            met.active = false;
+            session.spawnVfxBurst(met.x, 1.0, met.z, 0xe879f9, 18);
+            this.enqueueNotice(translateUi(session.language, 'toast.meteorBroken'), true);
+            sound?.playSupply();
+          }
+          session.playerProjectiles.release(proj);
+          return;
         }
       }
 
@@ -992,6 +1241,39 @@ export class CombatSystem {
           }
         }
       }
+
+      // Check shootable Explosive Bridge Barrel (Iron Viaduct)
+      if (session.level.arenaShape === 'bridge' && session.bridgeBarrel.active) {
+        const bar = session.bridgeBarrel;
+        const sumR = proj.radius + bar.radius;
+        if (distSqPointToSegment(bar.x, bar.z, proj.prevX, proj.prevZ, proj.x, proj.z) <= sumR * sumR) {
+          bar.hp -= proj.damage;
+          session.spawnVfxBurst(proj.x, 0.8, bar.z, 0xf97316, 4);
+          if (bar.hp <= 0) {
+            this.detonateBridgeBarrel(session, sound);
+          }
+          session.playerProjectiles.release(proj);
+          return;
+        }
+      }
+
+      // Check shootable Boss Abyss Meteor (Abyss Span)
+      if (session.level.arenaShape === 'bridge' && session.bridgeMeteor.active) {
+        const met = session.bridgeMeteor;
+        const sumR = proj.radius + met.radius;
+        if (distSqPointToSegment(met.x, met.z, proj.prevX, proj.prevZ, proj.x, proj.z) <= sumR * sumR) {
+          met.hp -= proj.damage;
+          session.spawnVfxBurst(proj.x, 1.0, met.z, 0xc084fc, 4);
+          if (met.hp <= 0) {
+            met.active = false;
+            session.spawnVfxBurst(met.x, 1.0, met.z, 0xe879f9, 18);
+            this.enqueueNotice(translateUi(session.language, 'toast.meteorBroken'), true);
+            sound?.playSupply();
+          }
+          session.playerProjectiles.release(proj);
+          return;
+        }
+      }
     });
   }
 
@@ -1035,6 +1317,9 @@ export class CombatSystem {
 
     const p = session.player;
     let finalDmg = amount * enemy.debuffDmgTakenMult;
+    if ((enemy.isElite || enemy.isBoss) && p.directModifiers.bossDamageBonus > 0) {
+      finalDmg *= 1 + p.directModifiers.bossDamageBonus;
+    }
     let isCrit = false;
 
     if (enemy.armorReduction > 0) {
@@ -1154,7 +1439,7 @@ export class CombatSystem {
     // In Survival arenas, killing elites directly equips a relic onto the hero!
     if (
       session.level.arenaShape === 'bridge' &&
-      (enemy.isElite || p.kills % 6 === 0)
+      (enemy.isElite || p.kills % 8 === 0)
     ) {
       this.grantDirectBridgeGear(session);
     } else if (session.level.arenaShape !== 'bridge' && enemy.isElite && !enemy.isBoss) {
@@ -1289,6 +1574,34 @@ export class CombatSystem {
     }
 
     const stacks = Math.max(1, gate.chargeTier);
+    session.bridgeGates[0].active = false;
+    session.bridgeGates[1].active = false;
+
+    if (gate.gateEffect === 'summon-drones') {
+      p.bridgeDroneTimer = 22;
+      p.bridgeDronePower = 1 + (stacks - 1) * 0.45;
+      p.bridgeDroneFireTimer = 0.05;
+      session.spawnVfxBurst(p.x, 1.2, p.z, 0x38bdf8, 16);
+      this.enqueueNotice(translateUi(session.language, 'toast.gateDrones', { lv: stacks }), true);
+      sound?.playSupply();
+      return;
+    }
+
+    if (gate.gateEffect === 'blast-wave') {
+      const blastDmg = (95 + 55 * stacks) * p.damageMult;
+      session.spawnShockwave(2, p.x, p.z - 2, 0.5, 16, 0xf97316, 0.45, true);
+      session.spawnVfxBurst(p.x, 1.2, p.z - 2, 0xfb923c, 18);
+      this.pendingCameraShake = Math.max(this.pendingCameraShake, 0.35);
+      session.enemies.forEachActive((e) => {
+        if (e.z <= p.z + 2.5) {
+          this.damageEnemy(session, e, blastDmg, 0, e.isBoss ? 0 : -14, sound, true);
+        }
+      });
+      this.enqueueNotice(translateUi(session.language, 'toast.gateBlast', { lv: stacks }), true);
+      sound?.playExplosion();
+      return;
+    }
+
     session.spawnVfxBurst(p.x, 1.15, p.z, 0xe879f9, 14);
     for (let i = 0; i < stacks; i += 1) {
       if (!gate.buffId || !this.upgSys.grantBuffById(session, gate.buffId)) {
@@ -1296,8 +1609,6 @@ export class CombatSystem {
         this.upgSys.recalculateStats(session);
       }
     }
-    session.bridgeGates[0].active = false;
-    session.bridgeGates[1].active = false;
     const gateLabel = session.language === 'en' ? gate.labelEn || gate.label : gate.label;
     this.enqueueNotice(
       translateUi(session.language, 'toast.gateCharged', { lv: stacks, label: gateLabel }),
@@ -1306,19 +1617,42 @@ export class CombatSystem {
     sound?.playSupply();
   }
 
-  private applyGateReward(
-    session: GameSession,
-    buffId: string,
-    _kind: string,
-    label: string
-  ): void {
-    const p = session.player;
-    session.spawnVfxBurst(p.x, 1.1, p.z, 0xfbbf24, 12);
-    if (!buffId || !this.upgSys.grantBuffById(session, buffId)) {
-      p.supplyDamageBonus += 0.2;
-      this.upgSys.recalculateStats(session);
+  public detonateBridgeBarrel(session: GameSession, sound: SoundEngine | null): void {
+    const bar = session.bridgeBarrel;
+    if (!bar.active) return;
+    bar.active = false;
+    const bx = bar.x;
+    const bz = bar.z;
+    const blastRadius = 6.8;
+    const blastRadSq = blastRadius * blastRadius;
+    const dmg = Math.max(160, 180 * session.player.damageMult);
+
+    session.spawnShockwave(1, bx, bz, 0.5, blastRadius, 0xf97316, 0.42, true);
+    session.spawnVfxBurst(bx, 1.0, bz, 0xfb923c, 22);
+    this.pendingCameraShake = Math.max(this.pendingCameraShake, 0.4);
+
+    session.enemyGrid.queryCircleCandidates(bx, bz, blastRadius, this.aoeQueryScratch, 48);
+    for (let i = 0; i < this.aoeQueryScratch.length; i += 1) {
+      const e = session.enemies.getRaw(this.aoeQueryScratch[i]);
+      if (!e.active || e.hp <= 0) continue;
+      const dx = e.x - bx;
+      const dz = e.z - bz;
+      const dSq = dx * dx + dz * dz;
+      if (dSq <= blastRadSq) {
+        const d = Math.sqrt(dSq) || 1;
+        this.damageEnemy(
+          session,
+          e,
+          dmg,
+          (dx / d) * 10,
+          e.isBoss ? 0 : Math.min(-6, (dz / d) * 10),
+          sound,
+          true
+        );
+      }
     }
-    this.enqueueNotice(translateUi(session.language, 'toast.gateBreak', { label }), false);
+    this.enqueueNotice(translateUi(session.language, 'toast.barrelBlast'), true);
+    sound?.playExplosion();
   }
 
   private spawnXpDrop(

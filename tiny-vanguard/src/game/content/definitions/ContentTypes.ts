@@ -148,7 +148,7 @@ export interface EquipmentDefinition {
   readonly nameEn: string;
   readonly description: string;
   readonly descriptionEn: string;
-  readonly tier: 'common' | 'rare' | 'epic';
+  readonly tier: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   readonly effects: readonly UpgradeEffect[];
 }
 
@@ -273,6 +273,10 @@ export interface LevelDefinition {
     readonly maxVfx: number;
   };
   readonly obstacles: readonly ObstacleConfig[];
+  readonly bridgeBarrels?: boolean;
+  readonly hazardZones?: boolean;
+  readonly movingGates?: boolean;
+  readonly bridgeMeteors?: boolean;
   readonly seed?: number;
   readonly visibleInMenu: boolean;
 }

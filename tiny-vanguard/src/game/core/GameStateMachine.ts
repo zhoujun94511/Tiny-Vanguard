@@ -65,4 +65,11 @@ export class GameStateMachine {
     this._pauseReasons.clear();
     this._state = 'menu';
   }
+
+  public enterEndlessFromVictory(): boolean {
+    if (this._state !== 'victory') return false;
+    this._pauseReasons.clear();
+    this._state = 'playing';
+    return true;
+  }
 }

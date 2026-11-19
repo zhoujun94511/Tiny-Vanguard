@@ -51,8 +51,8 @@ export class EnemyWaveSystem {
   ): void {
     const bossCfg = session.level.bossStage;
 
-    // Boss transition
-    if (session.elapsedSec >= bossCfg.triggerSec) {
+    // Boss transition (skipped once player enters Endless Mode)
+    if (!session.endlessMode && session.elapsedSec >= bossCfg.triggerSec) {
       if (!session.bossSpawned) {
         const spawned = this.spawnBoss(session, viewBounds, sound);
         if (spawned) {
@@ -79,20 +79,51 @@ export class EnemyWaveSystem {
       return;
     }
 
-    const stage = this.getActiveStage(session);
+    let stage = session.endlessMode
+      ? session.level.stages[session.level.stages.length - 1] ?? null
+      : this.getActiveStage(session);
     if (!stage) return;
+
+    let endlessHpScale = 1;
+    let endlessSpdScale = 1;
+    let endlessDmgScale = 1;
+    if (session.endlessMode) {
+      const endlessSec = Math.max(0, session.elapsedSec - session.endlessStartedAtSec);
+      session.endlessWaveLevel = 1 + Math.floor(endlessSec / 45);
+      endlessHpScale = 1 + (session.endlessWaveLevel - 1) * 0.28;
+      endlessSpdScale = 1 + Math.min(0.45, (session.endlessWaveLevel - 1) * 0.05);
+      endlessDmgScale = 1 + Math.min(2.0, (session.endlessWaveLevel - 1) * 0.04);
+
+      if (!session.bossSpawned || session.bossKilled) {
+        session.endlessBossTimer -= dt;
+        if (session.endlessBossTimer <= 0) {
+          session.endlessBossTimer = 55;
+          if (this.spawnBoss(session, viewBounds, sound)) {
+            session.bossSpawned = true;
+            session.bossKilled = false;
+          }
+        }
+      }
+    }
+
+    const modSpdMult = session.hasDoubleElites ? 1.12 : 1;
+    const modEliteMult = session.hasDoubleElites ? 0.6 : 1;
+    const modSpawnMult = session.hasHyperHorde ? 0.75 : 1;
+    const effectiveHpMult = stage.hpMultiplier * endlessHpScale;
+    const effectiveSpdMult = stage.speedMultiplier * endlessSpdScale * modSpdMult;
 
     // Elite timer
     if (stage.eliteIntervalSec && stage.eliteEnemyId) {
       session.eliteTimer -= dt;
       if (session.eliteTimer <= 0) {
-        session.eliteTimer = stage.eliteIntervalSec;
+        session.eliteTimer = Math.max(8, stage.eliteIntervalSec * modEliteMult);
         this.spawnEnemyOutsideView(
           session,
           stage.eliteEnemyId,
           viewBounds,
-          stage.hpMultiplier,
-          stage.speedMultiplier
+          effectiveHpMult,
+          effectiveSpdMult,
+          endlessDmgScale
         );
       }
     }
@@ -102,7 +133,7 @@ export class EnemyWaveSystem {
       session.formationTimer -= dt;
       if (session.formationTimer <= 0) {
         session.formationTimer = stage.formationIntervalSec;
-        this.spawnWaveFormation(session, stage);
+        this.spawnWaveFormation(session, stage, endlessHpScale, endlessSpdScale, endlessDmgScale);
       }
     }
 
@@ -115,7 +146,10 @@ export class EnemyWaveSystem {
     // Normal wave timer
     session.spawnTimer -= dt;
     if (session.spawnTimer <= 0) {
-      session.spawnTimer = stage.spawnIntervalSec;
+      const endlessCooldownScale = session.endlessMode
+        ? Math.max(0.55, 1 - (session.endlessWaveLevel - 1) * 0.06)
+        : 1;
+      session.spawnTimer = Math.max(0.22, stage.spawnIntervalSec * modSpawnMult * endlessCooldownScale);
       const cap = Math.min(stage.maxConcurrentNormal, session.level.entityBudgets.maxEnemies);
       if (session.enemies.activeCount >= cap) return;
 
@@ -128,8 +162,9 @@ export class EnemyWaveSystem {
             session,
             enemyId,
             viewBounds,
-            stage.hpMultiplier,
-            stage.speedMultiplier
+            effectiveHpMult,
+            effectiveSpdMult,
+            endlessDmgScale
           );
         }
       }
@@ -152,8 +187,16 @@ export class EnemyWaveSystem {
     return stage.entries[0]?.enemyId ?? null;
   }
 
-  public spawnWaveFormation(session: GameSession, stage: LevelStageConfig): number {
+  public spawnWaveFormation(
+    session: GameSession,
+    stage: LevelStageConfig,
+    hpScale = 1,
+    speedScale = 1,
+    dmgScale = 1
+  ): number {
     const cap = Math.min(stage.maxConcurrentNormal + 10, session.level.entityBudgets.maxEnemies);
+    const waveHpMult = stage.hpMultiplier * hpScale;
+    const waveSpdMult = stage.speedMultiplier * speedScale;
     let spawned = 0;
 
     if (stage.formationKind === 'lane-phalanx' && session.level.bridgeConfig) {
@@ -176,7 +219,7 @@ export class EnemyWaveSystem {
           const enemy = session.enemies.acquire();
           if (!enemy) break;
           const fx = Math.max(-maxX, Math.min(maxX, i * 2.6));
-          this.initEnemyFromDef(enemy, frontDef, fx, b.minZ + 4.4, stage.hpMultiplier, stage.speedMultiplier);
+          this.initEnemyFromDef(enemy, frontDef, fx, b.minZ + 4.4, waveHpMult, waveSpdMult, dmgScale);
           spawned += 1;
         }
       }
@@ -186,7 +229,7 @@ export class EnemyWaveSystem {
           const enemy = session.enemies.acquire();
           if (!enemy) break;
           const rx = Math.max(-maxX, Math.min(maxX, i * 1.75));
-          this.initEnemyFromDef(enemy, rearDef, rx, b.minZ + 2.3, stage.hpMultiplier, stage.speedMultiplier);
+          this.initEnemyFromDef(enemy, rearDef, rx, b.minZ + 2.3, waveHpMult, waveSpdMult, dmgScale);
           spawned += 1;
         }
       }
@@ -236,7 +279,7 @@ export class EnemyWaveSystem {
         if (isBlocked(sx, sz, def.radius)) continue;
         const enemy = session.enemies.acquire();
         if (!enemy) break;
-        this.initEnemyFromDef(enemy, def, sx, sz, stage.hpMultiplier, stage.speedMultiplier * 1.12);
+        this.initEnemyFromDef(enemy, def, sx, sz, waveHpMult, waveSpdMult * 1.12, dmgScale);
         spawned += 1;
       }
       return spawned;
@@ -263,7 +306,7 @@ export class EnemyWaveSystem {
       if (!isBlocked(cx, cz, eliteDef.radius) && session.enemies.activeCount < cap) {
         const lead = session.enemies.acquire();
         if (lead) {
-          this.initEnemyFromDef(lead, eliteDef, cx, cz, stage.hpMultiplier, stage.speedMultiplier);
+          this.initEnemyFromDef(lead, eliteDef, cx, cz, waveHpMult, waveSpdMult, dmgScale);
           spawned += 1;
         }
       }
@@ -275,7 +318,7 @@ export class EnemyWaveSystem {
         if (gx * gx + gz * gz > arenaLimit * arenaLimit || isBlocked(gx, gz, guardDef.radius)) continue;
         const g = session.enemies.acquire();
         if (!g) break;
-        this.initEnemyFromDef(g, guardDef, gx, gz, stage.hpMultiplier, stage.speedMultiplier);
+        this.initEnemyFromDef(g, guardDef, gx, gz, waveHpMult, waveSpdMult, dmgScale);
         spawned += 1;
       }
       return spawned;
@@ -307,7 +350,7 @@ export class EnemyWaveSystem {
 
       const enemy = session.enemies.acquire();
       if (!enemy) break;
-      this.initEnemyFromDef(enemy, ringDef, sx, sz, stage.hpMultiplier, stage.speedMultiplier);
+      this.initEnemyFromDef(enemy, ringDef, sx, sz, waveHpMult, waveSpdMult, dmgScale);
       spawned += 1;
     }
     return spawned;
@@ -406,7 +449,8 @@ export class EnemyWaveSystem {
     enemyId: string,
     viewBounds: Readonly<GroundViewBounds>,
     hpMult: number,
-    speedMult: number
+    speedMult: number,
+    dmgMult = 1
   ): EnemyEntity | null {
     const def = session.registries.enemies.get(enemyId);
     if (!def) return null;
@@ -417,7 +461,7 @@ export class EnemyWaveSystem {
     const enemy = def.isBoss ? session.enemies.acquireReserved() : session.enemies.acquire();
     if (!enemy) return null;
 
-    this.initEnemyFromDef(enemy, def, pos.x, pos.z, hpMult, speedMult);
+    this.initEnemyFromDef(enemy, def, pos.x, pos.z, hpMult, speedMult, dmgMult);
     return enemy;
   }
 
@@ -449,10 +493,16 @@ export class EnemyWaveSystem {
       Math.max(0, p.weapons.length - 1) * 0.14 +
       Math.max(0, p.damageMult - 1) * 0.45 +
       Math.min(10, p.equippedRelics.length) * 0.04;
-    const bossHpMult = durationScale * playerPowerScale;
+    const endlessScale = session.endlessMode
+      ? 1 + (session.endlessWaveLevel - 1) * 0.28
+      : 1;
+    const bossHpMult = durationScale * playerPowerScale * endlessScale;
     const bossSpeedMult = isBridge ? 0.68 : 1;
+    const bossDmgMult = session.endlessMode
+      ? 1 + Math.min(2.0, (session.endlessWaveLevel - 1) * 0.04)
+      : 1;
 
-    this.initEnemyFromDef(enemy, def, pos.x, pos.z, bossHpMult, bossSpeedMult);
+    this.initEnemyFromDef(enemy, def, pos.x, pos.z, bossHpMult, bossSpeedMult, bossDmgMult);
     session.bossSlot = enemy.slotIndex;
     session.bossGen = enemy.generation;
     sound?.playBossWarning();
@@ -465,7 +515,8 @@ export class EnemyWaveSystem {
     x: number,
     z: number,
     hpMult: number,
-    speedMult: number
+    speedMult: number,
+    dmgMult = 1
   ): void {
     enemy.defId = def.id;
     enemy.name = def.name;
@@ -482,7 +533,7 @@ export class EnemyWaveSystem {
     enemy.maxHp = Math.round(def.maxHp * hpMult);
     enemy.hp = enemy.maxHp;
     enemy.speed = def.speed * speedMult;
-    enemy.damage = def.damage;
+    enemy.damage = Math.round(def.damage * dmgMult);
     enemy.radius = def.radius;
     enemy.xpValue = def.xpValue;
     enemy.baseColor = def.color;

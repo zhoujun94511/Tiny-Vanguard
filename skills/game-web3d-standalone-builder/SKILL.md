@@ -67,8 +67,9 @@ smoke_test:
 
 ### Phase 4: 多端屏幕适配与双语 QA 调试控制台
 
-1. **多端屏幕适配**：窄竖屏相机缩放上限 `2.15x`，监听 `resize` / `orientationchange` / `visualViewport`；所有界面覆盖 `@media (max-width: 640px)`、`@media (max-height: 520px/540px)` 横屏矮视口、`env(safe-area-inset-*)` 与 `@media (pointer: coarse)` 触屏键帽隐藏。桌面端 `WASD` 移动配右下角 3 槽弧形技能轮盘（`Space`/`E`/`Q`），触屏端独立左虚拟摇杆。
+1. **多端屏幕适配与矢量 UI 规范**：窄竖屏相机缩放上限 `2.15x`，监听 `resize` / `orientationchange` / `visualViewport`；所有界面覆盖 `@media (max-width: 640px)`、`@media (max-height: 520px/540px)` 横屏矮视口、`env(safe-area-inset-*)` 与 `@media (pointer: coarse)` 触屏键帽隐藏。核心图标（武器、英雄、宝石）采用内联矢量 SVG 组件，避免纯色圆点与 Emoji 占位感。桌面端 `WASD` 移动配右下角 3 槽弧形技能轮盘（`Space`/`E`/`Q`），触屏端独立左虚拟摇杆。
 2. **双击 `F9` QA 调试台（`DebugBridge.ts` + `DebugPanel.vue`）**：3 秒内双击 `F9` 懒挂载，提供中英双语实时遥测与快捷操控，严禁硬编码关卡 ID，且收起态悬浮胶囊错位避开右上角 `⏸` 按钮。
+3. **无尽成长闭环（Limit Break）**：无尽模式下禁止“怪物无限膨胀而玩家属性池锁死”，须同步提供与无尽首领/满级溢出绑定的无限局内超限成长出口，并严格保持热循环零 GC。
 
 ### Phase 5: 门禁验收与单文件离线打包
 

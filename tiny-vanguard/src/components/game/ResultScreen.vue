@@ -1,14 +1,25 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { getRelicIcon } from '../../game/content/icons/itemIcons';
 import type { ResultSnapshot } from '../../game/core/GameTypes';
+import GameModal from '../common/GameModal.vue';
+import WeaponSvgIcon from '../common/WeaponSvgIcon.vue';
 import { useI18n } from './useI18n';
 
 const props = defineProps<{
   result: ResultSnapshot;
 }>();
 
+const earnedShardCount = computed(() =>
+  Object.values(props.result.earnedShards ?? {}).reduce((sum, v) => sum + v, 0)
+);
+const earnedGemCount = computed(() =>
+  Object.values(props.result.earnedGems ?? {}).reduce((sum, v) => sum + v, 0)
+);
+
 const emit = defineEmits<{
   (e: 'nextStage', levelId: string): void;
+  (e: 'enterEndless'): void;
   (e: 'restart'): void;
   (e: 'exit'): void;
 }>();
@@ -39,8 +50,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="overlay modal-backdrop">
-    <div class="card result-card">
+  <GameModal
+    :tone="result.victory ? 'gold' : 'danger'"
+    max-width="440px"
+    :aria-label="result.victory ? t('res.win') : t('res.lose')"
+  >
+    <div class="result-body">
       <div class="banner" :class="result.victory ? 'win' : 'lose'">
         {{ result.victory ? t('res.win') : t('res.lose') }}
       </div>
@@ -67,45 +82,72 @@ onUnmounted(() => {
       <div class="weapons-used">
         <span class="wu-label">{{ t('res.weapons') }}</span>
         <span v-for="w in result.weapons" :key="w.weaponId" class="wu-chip">
-          {{ tc(w.weaponId, 'name', w.name) }}<template v-if="w.isEvolved"> ★</template>
+          <WeaponSvgIcon :weapon-id="w.weaponId" :size="14" /> {{ tc(w.weaponId, 'name', w.name) }}<template v-if="w.isEvolved"> ★</template>
         </span>
       </div>
 
-      <div class="actions">
-        <button
-          v-if="result.victory && result.nextLevelId"
-          class="btn-primary"
-          type="button"
-          @click="emit('nextStage', result.nextLevelId)"
+      <div v-if="result.relicIds.length > 0" class="weapons-used" style="margin-top: 8px">
+        <span class="wu-label">{{ t('res.relics') }}</span>
+        <span
+          v-for="rid in result.relicIds.slice(0, 8)"
+          :key="rid"
+          class="wu-chip relic-chip"
+          :class="{ 'is-new': result.newlyDiscoveredRelicIds?.includes(rid) }"
         >
-          {{ t('res.nextStage', { name: tc(result.nextLevelId, 'name', result.nextLevelName ?? '') }) }}
-        </button>
-        <button
-          :class="result.victory && result.nextLevelId ? 'btn-ghost' : 'btn-primary'"
-          type="button"
-          @click="emit('restart')"
-        >
-          {{ t('res.restart') }}
-        </button>
-        <button class="btn-ghost" type="button" @click="emit('exit')">{{ t('res.exit') }}</button>
+          {{ getRelicIcon(rid) }}
+          <span v-if="result.newlyDiscoveredRelicIds?.includes(rid)" class="new-badge">NEW</span>
+        </span>
+        <span v-if="result.relicIds.length > 8" class="wu-chip relic-chip">+{{ result.relicIds.length - 8 }}</span>
+      </div>
+
+      <div class="rewards-row">
+        <div class="earned-stars-pill">
+          ⭐ {{ t('res.earnedStars', { count: result.earnedStars }) }}
+        </div>
+        <div v-if="earnedShardCount > 0" class="earned-stars-pill shard-pill">
+          🧩 {{ t('res.earnedShards', { count: earnedShardCount }) }}
+        </div>
+        <div v-if="earnedGemCount > 0" class="earned-stars-pill shard-pill">
+          💎 {{ t('res.earnedGems', { count: earnedGemCount }) }}
+        </div>
       </div>
     </div>
-  </div>
+
+    <template #actions>
+      <button
+        v-if="result.victory && result.nextLevelId"
+        class="btn-primary"
+        type="button"
+        @click="emit('nextStage', result.nextLevelId)"
+      >
+        {{ t('res.nextStage', { name: tc(result.nextLevelId, 'name', result.nextLevelName ?? '') }) }}
+      </button>
+      <button
+        v-if="result.victory && !result.isEndless"
+        class="btn-ghost"
+        type="button"
+        @click="emit('enterEndless')"
+      >
+        {{ t('res.endless') }}
+      </button>
+      <button
+        :class="result.victory && result.nextLevelId ? 'btn-ghost' : 'btn-primary'"
+        type="button"
+        @click="emit('restart')"
+      >
+        {{ t('res.restart') }}
+      </button>
+      <button class="btn-ghost" type="button" @click="emit('exit')">{{ t('res.exit') }}</button>
+    </template>
+  </GameModal>
 </template>
 
 <style scoped>
-.modal-backdrop {
-  background: rgba(10, 15, 30, 0.82);
-}
-.result-card {
-  max-width: 440px;
-  width: 92%;
-  max-height: 92dvh;
-  overflow-y: auto;
+.result-body {
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .banner {
   font-size: 28px;
@@ -165,6 +207,28 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
 }
+.rewards-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.shard-pill {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.14);
+  color: #bae6fd;
+}
+.relic-chip.is-new {
+  background: rgba(251, 191, 36, 0.24);
+  border: 1px solid rgba(251, 191, 36, 0.65);
+  color: #fde047;
+}
+.new-badge {
+  margin-left: 3px;
+  font-size: 9px;
+  font-weight: 900;
+  color: #fde047;
+}
 @media (max-height: 520px) {
   .result-card {
     gap: 8px;
@@ -187,5 +251,16 @@ onUnmounted(() => {
   .actions button {
     flex: 1 1 30%;
   }
+}
+.earned-stars-pill {
+  margin-top: 10px;
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.36);
+  color: #fde047;
+  font-size: 12px;
+  font-weight: 800;
 }
 </style>

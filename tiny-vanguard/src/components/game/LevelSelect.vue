@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
-import type { GameModeKey, LevelDefinition } from '../../game/content/definitions/ContentTypes';
+import type {
+  CharacterDefinition,
+  EquipmentDefinition,
+  GameModeKey,
+  LevelDefinition,
+} from '../../game/content/definitions/ContentTypes';
+import { getRelicIcon } from '../../game/content/icons/itemIcons';
+import {
+  CHALLENGE_MODIFIERS,
+  type ChallengeModifierId,
+} from '../../game/content/modifiers/modifiers';
 import type { SaveData } from '../../game/core/GameTypes';
+import { computePreRunPreviewStats } from '../../game/core/PreRunPreview';
+import HeroSvgIcon from '../common/HeroSvgIcon.vue';
 import PaginationBar from '../common/PaginationBar.vue';
 import { usePagination } from '../common/usePagination';
 import { useI18n } from './useI18n';
@@ -13,20 +25,25 @@ const LANDSCAPE_SHORT_STAGES_PER_PAGE = 2;
 const props = defineProps<{
   mode: GameModeKey;
   levels: readonly LevelDefinition[];
+  characters: readonly CharacterDefinition[];
+  relics?: readonly EquipmentDefinition[];
   saveData: SaveData;
+  unlockedLevelIds?: Record<string, boolean>;
 }>();
 
 const emit = defineEmits<{
   (e: 'select', levelId: string): void;
+  (e: 'selectCharacter', characterId: string): void;
+  (e: 'toggleModifier', modifierId: ChallengeModifierId): void;
   (e: 'back'): void;
 }>();
 
-const { t, tc, formatTime } = useI18n();
+const { lang, t, tc, formatTime } = useI18n();
 
 function computePageSize(): number {
   if (typeof window === 'undefined') return DESKTOP_STAGES_PER_PAGE;
   if (window.innerHeight <= 540) return LANDSCAPE_SHORT_STAGES_PER_PAGE;
-  if (window.innerWidth <= 640) return MOBILE_STAGES_PER_PAGE;
+  if (window.innerWidth <= 640 || window.innerHeight <= 680) return MOBILE_STAGES_PER_PAGE;
   return DESKTOP_STAGES_PER_PAGE;
 }
 
@@ -106,13 +123,43 @@ function getStageTheme(lvl: LevelDefinition): string {
 }
 
 function getStageIcon(lvl: LevelDefinition): string {
+  if (lvl.id === 'shadow-ruins') return '🔮';
+  if (lvl.id === 'iron-viaduct') return '⚙️';
+  if (lvl.id === 'astral-throne') return '👑';
+  if (lvl.id === 'abyss-span') return '🌌';
   if (lvl.arenaShape === 'bridge') {
     return (lvl.bridgeConfig?.lanternColor ?? 0) === 0x38bdf8 ? '❄️' : '🌉';
   }
   return isVolcanicPalette(lvl.groundColor) ? '🔥' : '🌾';
 }
 
-function getStageStatus(lvl: LevelDefinition): 'cleared' | 'recommended' | 'open' {
+function isHeroUnlocked(id: string): boolean {
+  return props.saveData.unlockedCharacters?.includes(id) ?? id === 'chibi-knight';
+}
+
+function getHeroStars(id: string): number {
+  return props.saveData.characterStars?.[id] ?? 1;
+}
+
+function isLevelUnlocked(id: string): boolean {
+  return props.unlockedLevelIds ? Boolean(props.unlockedLevelIds[id]) : true;
+}
+
+const selectedHero = computed(
+  () =>
+    props.characters.find((c) => c.id === props.saveData.selectedCharacterId) ??
+    props.characters[0] ??
+    null
+);
+
+const buildSummary = computed(() =>
+  selectedHero.value
+    ? computePreRunPreviewStats(selectedHero.value, props.saveData, props.relics ?? [])
+    : null
+);
+
+function getStageStatus(lvl: LevelDefinition): 'cleared' | 'recommended' | 'open' | 'locked' {
+  if (!isLevelUnlocked(lvl.id)) return 'locked';
   if ((props.saveData.bestVictorySecByLevel[lvl.id] ?? 0) > 0) return 'cleared';
   if (recommendedId.value === lvl.id) return 'recommended';
   return 'open';
@@ -140,20 +187,84 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
         <button class="btn-back" type="button" @click="emit('back')">{{ t('levels.back') }}</button>
       </div>
 
+      <!-- Hero Roster Selector -->
+      <div v-if="characters.length > 0" class="hero-strip">
+        <button
+          v-for="ch in characters"
+          :key="ch.id"
+          type="button"
+          class="hero-chip"
+          :class="{
+            active: saveData.selectedCharacterId === ch.id,
+            locked: !isHeroUnlocked(ch.id),
+          }"
+          :disabled="!isHeroUnlocked(ch.id)"
+          @click="emit('selectCharacter', ch.id)"
+        >
+          <HeroSvgIcon :hero-id="ch.id" :size="22" />
+          <span class="hero-info">
+            <strong class="hero-name">
+              {{ tc(ch.id, 'name', ch.name) }}
+              <span v-if="!isHeroUnlocked(ch.id)"> 🔒</span>
+              <span v-else class="hero-star-tag"> ★{{ getHeroStars(ch.id) }}</span>
+            </strong>
+            <span class="hero-meta">
+              {{ tc(ch.startingWeaponId, 'name', ch.startingWeaponId) }} · ❤️{{ ch.baseHp }}
+            </span>
+          </span>
+        </button>
+      </div>
+
+      <!-- Pre-Run Build Summary Strip -->
+      <div v-if="buildSummary" class="build-summary-strip">
+        <span class="bs-title">{{ t('levels.buildSummary') }}</span>
+        <span class="bs-stat">❤️ {{ buildSummary.maxHp }}</span>
+        <span class="bs-stat">⚔️ {{ t('levels.dmgLabel') }} +{{ buildSummary.damageBonusPct }}%</span>
+        <span class="bs-stat">🎯 {{ t('levels.critLabel') }} {{ buildSummary.critChancePct }}%</span>
+        <span class="bs-stat">🎲 {{ t('levels.rerollLabel') }} ×{{ buildSummary.rerolls }}</span>
+        <span v-for="rid in saveData.loadoutRelicIds" :key="rid" class="bs-relic">
+          {{ getRelicIcon(rid) }}
+        </span>
+        <span v-if="buildSummary.resonanceActive" class="bs-res">{{ t('levels.resonanceTag') }}</span>
+      </div>
+
+      <!-- Challenge Modifiers Strip -->
+      <div class="mod-strip">
+        <button
+          v-for="mod in CHALLENGE_MODIFIERS"
+          :key="mod.id"
+          type="button"
+          class="mod-chip"
+          :class="{ active: saveData.activeModifiers.includes(mod.id) }"
+          :title="lang === 'en' ? mod.descEn : mod.desc"
+          @click="emit('toggleModifier', mod.id)"
+        >
+          <span>{{ mod.icon }} {{ lang === 'en' ? mod.nameEn : mod.name }}</span>
+          <span class="mod-bonus">+{{ mod.starBonusPct }}%⭐</span>
+        </button>
+      </div>
+
       <div class="stage-list">
         <button
           v-for="(lvl, localIdx) in pagedItems"
           :key="lvl.id"
           type="button"
           class="stage-card"
-          :class="[getStageTheme(lvl), { recommended: getStageStatus(lvl) === 'recommended' }]"
+          :class="[
+            getStageTheme(lvl),
+            {
+              recommended: getStageStatus(lvl) === 'recommended',
+              locked: !isLevelUnlocked(lvl.id),
+            },
+          ]"
+          :disabled="!isLevelUnlocked(lvl.id)"
           @click="emit('select', lvl.id)"
         >
           <div class="card-accent"></div>
 
           <div class="stage-index-col">
             <span class="stage-index">{{ formatOrderNum(lvl.stageOrder, startIndex + localIdx) }}</span>
-            <span class="stage-icon">{{ getStageIcon(lvl) }}</span>
+            <span class="stage-icon">{{ isLevelUnlocked(lvl.id) ? getStageIcon(lvl) : '🔒' }}</span>
           </div>
 
           <div class="stage-body">
@@ -163,7 +274,8 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
               </span>
               <span class="stage-name">{{ tc(lvl.id, 'name', lvl.name) }}</span>
               <span class="status-chip" :class="getStageStatus(lvl)">
-                <template v-if="getStageStatus(lvl) === 'cleared'">✓ {{ t('levels.cleared') }}</template>
+                <template v-if="getStageStatus(lvl) === 'locked'">🔒 {{ t('levels.lockedHint') }}</template>
+                <template v-else-if="getStageStatus(lvl) === 'cleared'">✓ {{ t('levels.cleared') }}</template>
                 <template v-else-if="getStageStatus(lvl) === 'recommended'">{{ t('levels.recommended') }}</template>
                 <template v-else>{{ t('levels.open') }}</template>
               </span>
@@ -182,7 +294,7 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
           </div>
 
           <div class="stage-action-col">
-            <span class="deploy-btn">{{ t('levels.deploy') }}</span>
+            <span class="deploy-btn">{{ isLevelUnlocked(lvl.id) ? t('levels.deploy') : '🔒' }}</span>
           </div>
         </button>
       </div>
@@ -242,6 +354,166 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 14px;
+}
+.hero-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.hero-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s ease;
+}
+.hero-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(251, 191, 36, 0.45);
+}
+.hero-chip.active {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+  color: #f8fafc;
+}
+.hero-chip.locked {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+.hero-chip.locked:hover {
+  transform: none;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+.hero-star-tag {
+  color: #fbbf24;
+  font-size: 11px;
+}
+.build-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+  font-size: 11px;
+}
+.bs-title {
+  font-weight: 800;
+  color: #7dd3fc;
+  margin-right: 2px;
+}
+.bs-stat {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.85);
+  color: #e2e8f0;
+  font-weight: 700;
+}
+.bs-relic {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+.bs-res {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.22);
+  color: #fde047;
+  font-weight: 800;
+}
+.hero-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+}
+.hero-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hero-name {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hero-meta {
+  font-size: 10px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 640px) {
+  .hero-strip {
+    gap: 5px;
+  }
+  .hero-chip {
+    padding: 6px 7px;
+    gap: 6px;
+  }
+  .hero-dot {
+    width: 9px;
+    height: 9px;
+  }
+  .hero-name {
+    font-size: 11px;
+  }
+  .hero-meta {
+    font-size: 9px;
+  }
+  .mod-strip {
+    gap: 5px;
+  }
+  .mod-chip {
+    padding: 5px 6px;
+    font-size: 10px;
+  }
+}
+.mod-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.mod-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.48);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.mod-chip:hover {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #e2e8f0;
+}
+.mod-chip.active {
+  border-color: rgba(248, 113, 113, 0.78);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+.mod-bonus {
+  color: #fde047;
+  font-weight: 800;
 }
 .header-left {
   display: flex;
@@ -313,10 +585,19 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
 .stage-card.recommended {
   border-color: rgba(255, 209, 102, 0.48);
 }
+.stage-card.locked {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
 .stage-card:hover {
   transform: translateY(-2px);
   background: rgba(30, 44, 72, 0.98);
   border-color: #ffd166;
+}
+.stage-card.locked:hover {
+  transform: none;
+  background: rgba(23, 34, 56, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 .card-accent {
   position: absolute;
@@ -400,6 +681,10 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
 .status-chip.open {
   background: rgba(148, 163, 184, 0.16);
   color: #cbd5e1;
+}
+.status-chip.locked {
+  background: rgba(100, 116, 139, 0.22);
+  color: #94a3b8;
 }
 .stage-desc {
   margin: 0;

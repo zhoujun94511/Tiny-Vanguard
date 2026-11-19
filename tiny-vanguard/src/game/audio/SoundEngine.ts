@@ -1,6 +1,6 @@
 import { MusicSequencer, type BgmMode } from './MusicSequencer';
 
-export type ShootSfxKind = 'blaster' | 'chain' | 'sniper';
+export type ShootSfxKind = 'blaster' | 'chain' | 'sniper' | 'axe' | 'missile';
 
 const XP_SCALE_HZ = [440, 493.88, 554.37, 659.25, 739.99, 880];
 
@@ -264,6 +264,17 @@ export class SoundEngine {
     this.playTone(620, 0.045, 'triangle', 0.06, 860);
   }
 
+  public playReroll(): void {
+    this.playTone(520, 0.06, 'triangle', 0.065, 780, 0);
+    this.playTone(780, 0.08, 'sine', 0.06, 1040, 0.05);
+  }
+
+  public playExplosion(): void {
+    this.playTone(125, 0.28, 'sine', 0.14, 42);
+    this.playTone(210, 0.2, 'sawtooth', 0.08, 65);
+    this.playFilteredNoise(0.26, 0.11, 'lowpass', 1100, 180);
+  }
+
   public playShoot(kind: ShootSfxKind = 'blaster'): void {
     const nowMs = performance.now();
     const throttle = kind === 'sniper' ? 135 : kind === 'chain' ? 115 : 95;
@@ -279,6 +290,16 @@ export class SoundEngine {
     if (kind === 'chain') {
       this.playTone(920, 0.07, 'triangle', 0.04, 440);
       this.playFilteredNoise(0.06, 0.04, 'bandpass', 3200, 1400);
+      return;
+    }
+    if (kind === 'axe') {
+      this.playTone(320, 0.11, 'triangle', 0.06, 150);
+      this.playFilteredNoise(0.09, 0.045, 'bandpass', 1400, 620);
+      return;
+    }
+    if (kind === 'missile') {
+      this.playTone(880, 0.09, 'sine', 0.05, 1320);
+      this.playFilteredNoise(0.07, 0.035, 'highpass', 2800, 1600);
       return;
     }
     this.playTone(580, 0.055, 'triangle', 0.036, 820);

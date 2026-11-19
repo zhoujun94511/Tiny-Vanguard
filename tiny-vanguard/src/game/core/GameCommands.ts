@@ -11,6 +11,7 @@ export type GameCommand =
   | { type: 'triggerDash' }
   | { type: 'triggerGuard' }
   | { type: 'triggerFury' }
+  | { type: 'triggerAttack' }
   | { type: 'setQuality'; quality: QualityTier }
   | { type: 'setAudioEnabled'; enabled: boolean }
   | { type: 'setBgmEnabled'; enabled: boolean }

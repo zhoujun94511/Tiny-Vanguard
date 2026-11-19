@@ -16,7 +16,7 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
     maxPixelRatio: 1.25,
     shadowsEnabled: false,
     shadowMapSize: 512,
-    maxVfxMultiplier: 0.5,
+    maxVfxMultiplier: 0.65,
   },
   medium: {
     tier: 'medium',
@@ -24,7 +24,7 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
     maxPixelRatio: 1.75,
     shadowsEnabled: true,
     shadowMapSize: 1024,
-    maxVfxMultiplier: 0.8,
+    maxVfxMultiplier: 0.85,
   },
   high: {
     tier: 'high',

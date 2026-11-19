@@ -121,7 +121,7 @@ export class CameraController {
   }
 
   public update(dt: number): void {
-    const t = 1 - Math.exp(-9.5 * dt);
+    const t = 1 - Math.exp(-22 * dt);
     this.currentX += (this.targetX - this.currentX) * t;
     this.currentZ += (this.targetZ - this.currentZ) * t;
     if (this.shakeIntensity > 0.002) {

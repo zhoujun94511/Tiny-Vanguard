@@ -1,23 +1,64 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import logoUrl from '../../assets/logo-ui.png';
 import { APP_CONFIG } from '../../config/appConfig';
-import type { GameModeKey, LevelDefinition } from '../../game/content/definitions/ContentTypes';
-import type { LanguageCode, SaveData } from '../../game/core/GameTypes';
+import type {
+  CharacterDefinition,
+  EquipmentDefinition,
+  GameModeKey,
+  LevelDefinition,
+} from '../../game/content/definitions/ContentTypes';
+import { getTalentUpgradeCost, TALENTS, type TalentId } from '../../game/content/talents/talents';
+import type { GemTypeId } from '../../game/content/gems/gems';
+import type { GameSettings, LanguageCode, QualityTier, SaveData } from '../../game/core/GameTypes';
+import GameModal from '../common/GameModal.vue';
+import ArmoryModal from './ArmoryModal.vue';
+import CodexModal from './CodexModal.vue';
+import SettingsRows from './SettingsRows.vue';
 import { useI18n } from './useI18n';
 
 const props = defineProps<{
   levels: readonly LevelDefinition[];
+  characters: readonly CharacterDefinition[];
+  relics: readonly EquipmentDefinition[];
   saveData: SaveData;
+  settings: GameSettings;
   audioOn: boolean;
   touchMode?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'selectMode', mode: GameModeKey): void;
+  (e: 'setQuality', q: QualityTier): void;
+  (e: 'setAudio', enabled: boolean): void;
+  (e: 'setBgm', enabled: boolean): void;
+  (e: 'setDamageNums', enabled: boolean): void;
   (e: 'setLanguage', lang: LanguageCode): void;
   (e: 'toggleAudio'): void;
+  (e: 'upgradeTalent', id: TalentId): void;
+  (e: 'resetTalents'): void;
+  (e: 'unlockCharacter', id: string): void;
+  (e: 'starUpCharacter', id: string): void;
+  (e: 'toggleLoadoutRelic', id: string): void;
+  (e: 'unlockSecondSlot'): void;
+  (e: 'refineRelic', id: string): void;
+  (e: 'unlockRelicSocket', id: string): void;
+  (e: 'socketGem', relicId: string, gemKey: string): void;
+  (e: 'unsocketGem', relicId: string): void;
+  (e: 'fuseGem', gemType: GemTypeId, tier: 1 | 2): void;
+  (e: 'enchantRelic', relicId: string): void;
 }>();
+
+const settingsOpen = ref(false);
+const armoryOpen = ref(false);
+const codexOpen = ref(false);
+
+const canUpgradeTalent = computed(() =>
+  TALENTS.some((def) => {
+    const lv = Math.max(0, Math.floor(props.saveData.talents[def.id] ?? 0));
+    return lv < def.maxLevel && props.saveData.stars >= getTalentUpgradeCost(def, lv);
+  })
+);
 
 const { lang, t } = useI18n();
 
@@ -82,6 +123,17 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
       <span class="ver-pill">v{{ APP_CONFIG.version }}</span>
 
       <div class="top-actions">
+        <button
+          type="button"
+          class="record-pill armory-pill"
+          :aria-label="t('menu.armoryAria')"
+          @click="armoryOpen = true"
+        >
+          <span>🛡️ <span class="armory-text">{{ t('menu.armoryPill') }}</span></span>
+          <span class="sep">·</span>
+          <span class="star-amt">⭐ {{ saveData.stars }}</span>
+          <span v-if="canUpgradeTalent" class="armory-dot" aria-hidden="true"></span>
+        </button>
         <div class="record-pill">
           <span>🏆 {{ saveData.victories }}</span>
           <span class="sep">·</span>
@@ -95,6 +147,22 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
           @click="emit('toggleAudio')"
         >
           {{ audioOn ? '🔊' : '🔇' }}
+        </button>
+        <button
+          type="button"
+          class="audio-pill"
+          :aria-label="t('menu.codexAria')"
+          @click="codexOpen = true"
+        >
+          📖
+        </button>
+        <button
+          type="button"
+          class="audio-pill"
+          :aria-label="t('menu.settingsAria')"
+          @click="settingsOpen = true"
+        >
+          ⚙️
         </button>
         <button
           type="button"
@@ -153,6 +221,57 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
         <span class="hint-chip">⚡ {{ t('menu.hintAuto') }}</span>
       </template>
     </div>
+    <!-- Top-Level Menu Settings Modal -->
+    <GameModal
+      v-if="settingsOpen"
+      badge-icon="⚙️"
+      :title="t('menu.settingsTitle')"
+      max-width="390px"
+      closable
+      close-on-backdrop
+      @close="settingsOpen = false"
+    >
+      <SettingsRows
+        :settings="settings"
+        @set-quality="(q) => emit('setQuality', q)"
+        @set-audio="(v) => emit('setAudio', v)"
+        @set-bgm="(v) => emit('setBgm', v)"
+        @set-damage-nums="(v) => emit('setDamageNums', v)"
+        @set-language="(l) => emit('setLanguage', l)"
+      />
+      <template #actions>
+        <button class="btn-primary" type="button" @click="settingsOpen = false">
+          {{ t('menu.settingsClose') }}
+        </button>
+      </template>
+    </GameModal>
+
+    <ArmoryModal
+      v-if="armoryOpen"
+      :save-data="saveData"
+      :characters="characters"
+      :relics="relics"
+      @close="armoryOpen = false"
+      @upgrade-talent="(id) => emit('upgradeTalent', id)"
+      @reset-talents="emit('resetTalents')"
+      @unlock-character="(id) => emit('unlockCharacter', id)"
+      @star-up-character="(id) => emit('starUpCharacter', id)"
+      @toggle-loadout-relic="(id) => emit('toggleLoadoutRelic', id)"
+      @unlock-second-slot="emit('unlockSecondSlot')"
+      @refine-relic="(id) => emit('refineRelic', id)"
+      @unlock-relic-socket="(id) => emit('unlockRelicSocket', id)"
+      @socket-gem="(rid, gkey) => emit('socketGem', rid, gkey)"
+      @unsocket-gem="(id) => emit('unsocketGem', id)"
+      @fuse-gem="(gt, tier) => emit('fuseGem', gt, tier)"
+      @enchant-relic="(id) => emit('enchantRelic', id)"
+    />
+
+    <CodexModal
+      v-if="codexOpen"
+      :save-data="saveData"
+      :relics="relics"
+      @close="codexOpen = false"
+    />
   </div>
 </template>
 
@@ -225,6 +344,27 @@ const modeEntries = computed<ModeEntrySummary[]>(() => {
   color: #ffd166;
   display: flex;
   gap: 6px;
+}
+.armory-pill {
+  cursor: pointer;
+  border-color: rgba(251, 191, 36, 0.42);
+  color: #f8fafc;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+.armory-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(251, 191, 36, 0.78);
+}
+.armory-pill .star-amt {
+  color: #fde047;
+  font-weight: 800;
+}
+.armory-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.9);
 }
 .sep {
   color: #64748b;
@@ -446,6 +586,32 @@ kbd {
   .hint-chip {
     font-size: 11px;
     padding: 4px 9px;
+  }
+}
+@media (max-width: 640px) {
+  .title-top {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .ver-pill {
+    margin-right: auto;
+  }
+  .top-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+}
+@media (max-width: 480px) {
+  .ver-pill,
+  .armory-text,
+  .armory-pill .sep {
+    display: none;
+  }
+  .record-pill {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 }
 @media (max-height: 520px) {

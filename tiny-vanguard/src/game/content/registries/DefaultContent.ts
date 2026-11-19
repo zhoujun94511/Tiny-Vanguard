@@ -42,6 +42,9 @@ export function createDefaultRegistries(): ContentRegistries {
       'weapon-nova-pulse',
       'weapon-chain-lightning',
       'weapon-sniper-high-hp',
+      'weapon-boomerang-axe',
+      'weapon-venom-aura',
+      'weapon-seeker-missile',
     ]),
     enemyBehaviorIds: new Set([
       'enemy-chaser',

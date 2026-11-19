@@ -22,6 +22,7 @@ export class MovementSystem {
     if (p.hitFlashTimer > 0) p.hitFlashTimer = Math.max(0, p.hitFlashTimer - dt);
     if (p.dashCooldown > 0) p.dashCooldown = Math.max(0, p.dashCooldown - dt);
     if (p.guardCooldown > 0) p.guardCooldown = Math.max(0, p.guardCooldown - dt);
+    if (p.attackCooldown > 0) p.attackCooldown = Math.max(0, p.attackCooldown - dt);
 
     const vec = input.getMoveVector(this.moveScratch);
     const magSq = vec.x * vec.x + vec.y * vec.y;
@@ -100,7 +101,7 @@ export class MovementSystem {
       const b = session.level.bridgeConfig;
       const maxX = Math.max(1, b.halfWidth - p.colliderRadius - 0.38);
       p.x = Math.max(-maxX, Math.min(maxX, p.x));
-      p.z = Math.max(b.defenseLineZ - 3.3, Math.min(b.defenseLineZ - 0.85, p.z));
+      p.z = Math.max(b.defenseLineZ - 4.8, Math.min(b.defenseLineZ - 0.85, p.z));
     } else {
       const maxR = Math.max(2, session.level.arenaRadius - p.colliderRadius);
       const rSq = p.x * p.x + p.z * p.z;

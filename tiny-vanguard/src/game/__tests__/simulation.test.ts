@@ -39,7 +39,7 @@ describe('Full Gameplay Loop Simulation (Headless)', () => {
     upg.applyUpgrade(session, 'unlock-orbit-shields');
     upg.applyUpgrade(session, 'unlock-frost-nova');
 
-    for (let step = 0; step < 60 * 35; step += 1) {
+    for (let step = 0; step < 60 * 42; step += 1) {
       movement.updatePlayer(session, input, dt);
       wave.update(session, dt, viewBounds, combat, null);
       combat.update(session, dt, null, null);
@@ -222,7 +222,7 @@ describe('Full Gameplay Loop Simulation (Headless)', () => {
     for (let i = 0; i < 60 * 11; i += 1) {
       prog.update(s2, 1 / 60, combat, null);
     }
-    expect(s2.bridgeGates[0].gateMode).toBe('break');
+    expect(s2.bridgeGates[0].gateMode).toBe('charge');
     expect(s2.bridgeGates[1].gateMode).toBe('charge');
     expect(s2.bridgeGates[1].chargeTier).toBe(s2.bridgeGates[1].corrupted ? 0 : 1);
 

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type { GameModeKey } from '../../game/content/definitions/ContentTypes';
+import type { ChallengeModifierId } from '../../game/content/modifiers/modifiers';
+import type { GemTypeId } from '../../game/content/gems/gems';
+import type { TalentId } from '../../game/content/talents/talents';
 import { GameRuntime } from '../../game/core/GameRuntime';
 import type {
   GameSettings,
@@ -18,6 +21,7 @@ import {
   hasDebugUrlFlag,
 } from '../../game/debug/DebugBridge';
 import { InputController } from '../../game/input/InputController';
+import GameModal from '../common/GameModal.vue';
 import DebugPanel from './DebugPanel.vue';
 import GameHud from './GameHud.vue';
 import LevelSelect from './LevelSelect.vue';
@@ -51,7 +55,7 @@ function detectSmallOrMediumViewport(): boolean {
   return window.innerWidth <= 1024 || window.innerHeight <= 620;
 }
 
-const saveData = ref<SaveData>({ ...runtime.getSaveData() });
+const saveData = ref<SaveData>(structuredClone(runtime.getSaveData()));
 const settings = ref<GameSettings>({ ...runtime.getSettings() });
 const hasTouchInput = ref(InputController.isCoarsePointer());
 const isSmallOrMediumScreen = ref(detectSmallOrMediumViewport());
@@ -61,7 +65,18 @@ const debugBridge = new DebugBridge(runtime);
 const f9Detector = createF9DoublePressDetector(3000);
 
 const visibleLevels = computed(() => runtime.getVisibleLevels());
+const availableCharacters = computed(() => runtime.getCharacters());
+const relicCatalog = computed(() => runtime.getRelicCatalog());
 const modeLevels = computed(() => runtime.getLevelsByMode(selectedMode.value));
+const unlockedLevelIds = computed<Record<string, boolean>>(() => {
+  void saveData.value.bestVictorySecByLevel;
+  const bypass = debugOpen.value || hasDebugUrlFlag();
+  const map: Record<string, boolean> = {};
+  for (const lvl of visibleLevels.value) {
+    map[lvl.id] = runtime.isLevelUnlocked(lvl.id, bypass);
+  }
+  return map;
+});
 
 const unsubs: Array<() => void> = [];
 
@@ -101,9 +116,14 @@ function onGlobalKeyDown(e: KeyboardEvent) {
     e.code === 'KeyA' ||
     e.code === 'KeyS' ||
     e.code === 'KeyD' ||
+    e.code === 'ArrowUp' ||
+    e.code === 'ArrowDown' ||
+    e.code === 'ArrowLeft' ||
+    e.code === 'ArrowRight' ||
     e.code === 'Space' ||
     e.code === 'KeyE' ||
-    e.code === 'KeyQ'
+    e.code === 'KeyQ' ||
+    e.code === 'KeyJ'
   ) {
     if (!isSmallOrMediumScreen.value) {
       hasTouchInput.value = false;
@@ -171,7 +191,7 @@ onMounted(() => {
       if (state === 'menu') {
         result.value = null;
         hud.value = null;
-        saveData.value = { ...runtime.getSaveData() };
+        saveData.value = structuredClone(runtime.getSaveData());
       }
     }),
     runtime.events.on('hud', (snap) => {
@@ -182,7 +202,7 @@ onMounted(() => {
     }),
     runtime.events.on('result', (res) => {
       result.value = res;
-      saveData.value = { ...runtime.getSaveData() };
+      saveData.value = structuredClone(runtime.getSaveData());
     }),
     runtime.events.on('error', (err) => {
       errorMsg.value = err.message;
@@ -224,6 +244,7 @@ onUnmounted(() => {
 function handleSelectLevel(levelId: string) {
   const now = performance.now();
   if (gameState.value === 'loading' || now - lastStartLevelMs < 260) return;
+  if (!unlockedLevelIds.value[levelId]) return;
   lastStartLevelMs = now;
   result.value = null;
   levelUpRequest.value = null;
@@ -280,6 +301,111 @@ function handleSetLanguage(language: LanguageCode) {
   settings.value = { ...runtime.getSettings() };
   setLanguageState(language);
 }
+
+function handleUpgradeTalent(id: TalentId) {
+  if (runtime.upgradeTalent(id)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleResetTalents() {
+  if (runtime.resetTalents()) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleSelectCharacter(characterId: string) {
+  if (runtime.selectCharacter(characterId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleToggleModifier(modifierId: ChallengeModifierId) {
+  if (runtime.toggleModifier(modifierId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleUnlockCharacter(characterId: string) {
+  if (runtime.unlockCharacter(characterId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleStarUpCharacter(characterId: string) {
+  if (runtime.starUpCharacter(characterId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleToggleLoadoutRelic(relicId: string) {
+  if (runtime.toggleLoadoutRelic(relicId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleUnlockSecondSlot() {
+  if (runtime.unlockSecondLoadoutSlot()) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleRefineRelic(relicId: string) {
+  if (runtime.refineRelic(relicId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleUnlockRelicSocket(relicId: string) {
+  if (runtime.unlockRelicSocket(relicId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleSocketGem(relicId: string, gemKey: string) {
+  if (runtime.socketGem(relicId, gemKey)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleUnsocketGem(relicId: string) {
+  if (runtime.unsocketGem(relicId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleFuseGem(gemType: GemTypeId, tier: 1 | 2) {
+  if (runtime.fuseGem(gemType, tier)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleEnchantRelic(relicId: string) {
+  if (runtime.enchantRelic(relicId)) {
+    runtime.sound.playUiClick();
+    saveData.value = structuredClone(runtime.getSaveData());
+  }
+}
+
+function handleEnterEndless() {
+  if (runtime.enterEndlessMode()) {
+    runtime.sound.playUiClick();
+    result.value = null;
+  }
+}
 </script>
 
 <template>
@@ -291,12 +417,31 @@ function handleSetLanguage(language: LanguageCode) {
     <MainMenu
       v-if="bootReady && gameState === 'menu' && menuStep === 'main'"
       :levels="visibleLevels"
+      :characters="availableCharacters"
+      :relics="relicCatalog"
       :save-data="saveData"
+      :settings="settings"
       :audio-on="settings.audioEnabled || settings.bgmEnabled"
       :touch-mode="isTouchMode"
       @select-mode="(m) => { runtime.sound.playUiClick(); selectedMode = m; menuStep = 'levels'; runtime.setMenuPreviewMode(m); }"
+      @set-quality="handleSetQuality"
+      @set-audio="handleSetAudio"
+      @set-bgm="handleSetBgm"
+      @set-damage-nums="handleSetDamageNums"
       @set-language="handleSetLanguage"
       @toggle-audio="handleToggleMasterAudio"
+      @upgrade-talent="handleUpgradeTalent"
+      @reset-talents="handleResetTalents"
+      @unlock-character="handleUnlockCharacter"
+      @star-up-character="handleStarUpCharacter"
+      @toggle-loadout-relic="handleToggleLoadoutRelic"
+      @unlock-second-slot="handleUnlockSecondSlot"
+      @refine-relic="handleRefineRelic"
+      @unlock-relic-socket="handleUnlockRelicSocket"
+      @socket-gem="handleSocketGem"
+      @unsocket-gem="handleUnsocketGem"
+      @fuse-gem="handleFuseGem"
+      @enchant-relic="handleEnchantRelic"
     />
 
     <!-- Mode Stage Sequence Sub-Screen (1, 2, 3...) -->
@@ -304,8 +449,13 @@ function handleSetLanguage(language: LanguageCode) {
       v-if="bootReady && gameState === 'menu' && menuStep === 'levels'"
       :mode="selectedMode"
       :levels="modeLevels"
+      :characters="availableCharacters"
+      :relics="relicCatalog"
       :save-data="saveData"
+      :unlocked-level-ids="unlockedLevelIds"
       @select="handleSelectLevel"
+      @select-character="handleSelectCharacter"
+      @toggle-modifier="handleToggleModifier"
       @back="menuStep = 'main'; runtime.setMenuPreviewMode(null)"
     />
 
@@ -318,6 +468,7 @@ function handleSetLanguage(language: LanguageCode) {
       @dash="runtime.dispatch({ type: 'triggerDash' })"
       @guard="runtime.dispatch({ type: 'triggerGuard' })"
       @fury="runtime.dispatch({ type: 'triggerFury' })"
+      @attack="runtime.dispatch({ type: 'triggerAttack' })"
     />
 
     <!-- Touch Virtual Joystick -->
@@ -333,14 +484,18 @@ function handleSetLanguage(language: LanguageCode) {
       :request="levelUpRequest"
       :touch-mode="isTouchMode"
       @choose="handleChooseUpgrade"
+      @reroll="(rid) => runtime.rerollLevelUp(rid)"
+      @skip="(rid) => runtime.skipLevelUp(rid)"
     />
 
     <!-- Pause Modal -->
     <PauseMenu
       v-if="gameState === 'paused'"
       :settings="settings"
+      :endless-mode="hud?.endlessMode"
       @resume="runtime.dispatch({ type: 'resume' })"
       @restart="runtime.dispatch({ type: 'restart' })"
+      @extract="runtime.extractEndlessRun()"
       @exit="menuStep = 'main'; runtime.dispatch({ type: 'exitToMenu' })"
       @set-quality="handleSetQuality"
       @set-audio="handleSetAudio"
@@ -354,6 +509,7 @@ function handleSetLanguage(language: LanguageCode) {
       v-if="(gameState === 'victory' || gameState === 'game-over') && result"
       :result="result"
       @next-stage="handleSelectLevel"
+      @enter-endless="handleEnterEndless"
       @restart="runtime.dispatch({ type: 'restart' })"
       @exit="menuStep = 'main'; runtime.dispatch({ type: 'exitToMenu' })"
     />
@@ -372,15 +528,20 @@ function handleSetLanguage(language: LanguageCode) {
     />
 
     <!-- Error Fallback -->
-    <div v-if="errorMsg" class="overlay modal-backdrop">
-      <div class="card error-card">
-        <h3>{{ t('err.title') }}</h3>
-        <p>{{ errorMsg }}</p>
+    <GameModal
+      v-if="errorMsg"
+      badge-icon="⚠️"
+      tone="danger"
+      :title="t('err.title')"
+      max-width="400px"
+    >
+      <p class="error-msg">{{ errorMsg }}</p>
+      <template #actions>
         <button class="btn-primary" type="button" @click="errorMsg = null; menuStep = 'main'; runtime.dispatch({ type: 'exitToMenu' })">
           {{ t('err.back') }}
         </button>
-      </div>
-    </div>
+      </template>
+    </GameModal>
   </div>
 </template>
 
@@ -407,11 +568,12 @@ function handleSetLanguage(language: LanguageCode) {
   pointer-events: none;
   z-index: 8;
 }
-.error-card {
-  max-width: 400px;
-  width: 90%;
+.error-msg {
+  margin: 0;
   text-align: center;
-  color: #fff;
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .toast-banner {
   position: fixed;
@@ -436,9 +598,14 @@ function handleSetLanguage(language: LanguageCode) {
 }
 @media (max-width: 1024px) {
   .toast-banner {
-    bottom: max(142px, calc(env(safe-area-inset-bottom) + 132px));
+    bottom: max(204px, calc(env(safe-area-inset-bottom) + 198px));
     font-size: 12px;
     padding: 5px 12px;
+  }
+}
+@media (max-height: 520px) {
+  .toast-banner {
+    bottom: max(168px, calc(env(safe-area-inset-bottom) + 162px));
   }
 }
 </style>

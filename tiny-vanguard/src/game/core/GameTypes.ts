@@ -1,3 +1,5 @@
+import type { ChallengeModifierId } from '../content/modifiers/modifiers';
+
 export type GameStateId =
   | 'menu'
   | 'loading'
@@ -47,11 +49,13 @@ export interface HudSnapshot {
   arenaShape: 'circle' | 'bridge';
   levelName: string;
   state: GameStateId;
+  endlessMode: boolean;
   hp: number;
   maxHp: number;
   shield: number;
   maxShield: number;
   relicCount: number;
+  relicIds: string[];
   xp: number;
   xpToNext: number;
   level: number;
@@ -65,6 +69,7 @@ export interface HudSnapshot {
   dashReadyRatio: number; // 1 = ready, 0..1 recharging
   guardReadyRatio: number; // 1 = ready, 0..1 recharging
   furyRatio: number; // 0..1 (1 = ready to cast)
+  attackReadyRatio: number; // 1 = ready, 0..1 recharging
   weaponSlots: WeaponSlotSnapshot[];
   maxWeaponSlots: number;
   boss: BossHudSnapshot | null;
@@ -89,6 +94,7 @@ export interface LevelUpRequest {
   sessionId: number;
   requestId: number;
   playerLevel: number;
+  rerollsRemaining: number;
   choices: UpgradeChoiceView[];
 }
 
@@ -103,7 +109,13 @@ export interface ResultSnapshot {
   kills: number;
   playerLevel: number;
   weapons: WeaponSlotSnapshot[];
+  relicIds: string[];
+  newlyDiscoveredRelicIds: string[];
   isNewBestTime: boolean;
+  isEndless: boolean;
+  earnedStars: number;
+  earnedShards: Record<string, number>;
+  earnedGems: Record<string, number>;
   reason: string;
 }
 
@@ -118,7 +130,25 @@ export interface GameSettings {
 export interface SaveData {
   bestSurvivalSecByLevel: Record<string, number>;
   bestVictorySecByLevel: Record<string, number>;
+  bestEndlessSecByLevel: Record<string, number>;
   victories: number;
   totalRuns: number;
+  stars: number;
+  totalStarsEarned: number;
+  talents: Record<string, number>;
+  selectedCharacterId: string;
+  unlockedCharacters: string[];
+  characterShards: Record<string, number>;
+  characterStars: Record<string, number>;
+  loadoutRelicIds: string[];
+  loadoutSlotsUnlocked: number;
+  relicRanks: Record<string, number>;
+  gemInventory: Record<string, number>;
+  relicSockets: Record<string, string | null>;
+  relicEnchants: Record<string, string>;
+  activeModifiers: ChallengeModifierId[];
+  discoveredRelics: string[];
+  discoveredEvolvedWeapons: string[];
+  unlockedAchievements: string[];
   settings: GameSettings;
 }

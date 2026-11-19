@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import type { LevelUpRequest, UpgradeChoiceView } from '../../game/core/GameTypes';
+import WeaponSvgIcon from '../common/WeaponSvgIcon.vue';
 import { useI18n } from './useI18n';
 
 const props = defineProps<{
@@ -10,15 +11,44 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'choose', upgradeId: string): void;
+  (e: 'reroll', requestId: number): void;
+  (e: 'skip', requestId: number): void;
 }>();
 
 const { t, tc } = useI18n();
 const submitted = ref(false);
 
+watch(
+  () => props.request.requestId,
+  () => {
+    submitted.value = false;
+  }
+);
+
 function selectChoice(upgradeId: string) {
   if (submitted.value) return;
   submitted.value = true;
   emit('choose', upgradeId);
+}
+
+const WEAPON_PREFIXES = [
+  'star-blaster',
+  'orbit-shields',
+  'frost-nova',
+  'thunder-arc',
+  'rail-sniper',
+  'boomerang-axe',
+  'venom-aura',
+  'seeker-missile',
+] as const;
+
+function resolveChoiceWeaponId(c: UpgradeChoiceView): string | null {
+  if (c.category !== 'weapon-unlock' && c.category !== 'weapon-upgrade') return null;
+  const id = c.upgradeId.startsWith('unlock-') ? c.upgradeId.slice(7) : c.upgradeId;
+  for (const wid of WEAPON_PREFIXES) {
+    if (id === wid || id.startsWith(`${wid}-`)) return wid;
+  }
+  return null;
 }
 
 function getChoiceIcon(c: UpgradeChoiceView): string {
@@ -28,6 +58,9 @@ function getChoiceIcon(c: UpgradeChoiceView): string {
   if (id.includes('frost')) return '❄️';
   if (id.includes('orbit')) return '🛡️';
   if (id.includes('star-blaster')) return '✨';
+  if (id.includes('boomerang')) return '🪓';
+  if (id.includes('venom')) return '☠️';
+  if (id.includes('seeker')) return '🚀';
   if (id.includes('fire')) return '🔥';
   if (id.includes('plague')) return '☠️';
   if (id.includes('sunder')) return '🔨';
@@ -62,6 +95,8 @@ function onKeyDown(e: KeyboardEvent) {
     selectChoice(props.request.choices[1].upgradeId);
   } else if ((e.key === '3' || e.code === 'Numpad3') && props.request.choices[2]) {
     selectChoice(props.request.choices[2].upgradeId);
+  } else if (e.code === 'KeyR' && !submitted.value && props.request.rerollsRemaining > 0) {
+    emit('reroll', props.request.requestId);
   }
 }
 
@@ -117,7 +152,12 @@ onUnmounted(() => {
           <div class="crest-stage">
             <div class="crest-aura"></div>
             <div class="crest-frame">
-              <span class="crest-icon">{{ getChoiceIcon(c) }}</span>
+              <WeaponSvgIcon
+                v-if="resolveChoiceWeaponId(c)"
+                :weapon-id="resolveChoiceWeaponId(c)!"
+                :size="24"
+              />
+              <span v-else class="crest-icon">{{ getChoiceIcon(c) }}</span>
             </div>
           </div>
 
@@ -145,6 +185,25 @@ onUnmounted(() => {
           </div>
         </button>
       </div>
+
+      <div class="reroll-bar">
+        <button
+          type="button"
+          class="reroll-btn"
+          :disabled="submitted || request.rerollsRemaining <= 0"
+          @click="emit('reroll', request.requestId)"
+        >
+          🎲 {{ t('upg.reroll', { count: request.rerollsRemaining }) }}<template v-if="!touchMode"> [R]</template>
+        </button>
+        <button
+          type="button"
+          class="skip-btn"
+          :disabled="submitted"
+          @click="submitted = true; emit('skip', request.requestId)"
+        >
+          ⏭️ {{ t('upg.skip') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -156,6 +215,39 @@ onUnmounted(() => {
     rgba(6, 11, 24, 0.84);
   backdrop-filter: blur(5px);
   animation: backdropIn 0.18s ease-out;
+}
+.reroll-bar {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.reroll-btn,
+.skip-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.reroll-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(251, 191, 36, 0.7);
+  color: #fde047;
+}
+.skip-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(74, 222, 128, 0.7);
+  color: #86efac;
+}
+.reroll-btn:disabled,
+.skip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 @keyframes backdropIn {
   from {
@@ -475,6 +567,15 @@ onUnmounted(() => {
   }
   .card-action-bar {
     padding: 5px 8px;
+  }
+  .reroll-bar {
+    margin-top: 6px;
+    gap: 8px;
+  }
+  .reroll-btn,
+  .skip-btn {
+    padding: 5px 12px;
+    font-size: 11px;
   }
 }
 @media (max-height: 440px) {

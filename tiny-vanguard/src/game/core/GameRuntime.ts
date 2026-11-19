@@ -2,10 +2,38 @@ import * as THREE from 'three';
 import { SoundEngine } from '../audio/SoundEngine';
 import { QUALITY_PROFILES } from '../config/qualityConfig';
 import { RUNTIME_CONFIG } from '../config/runtimeConfig';
-import type { GameModeKey, LevelDefinition } from '../content/definitions/ContentTypes';
+import type {
+  CharacterDefinition,
+  GameModeKey,
+  LevelDefinition,
+} from '../content/definitions/ContentTypes';
 import { validateLevelConfig } from '../content/registries/ConfigValidator';
 import type { ContentRegistries } from '../content/registries/ContentRegistry';
 import { createDefaultRegistries } from '../content/registries/DefaultContent';
+import {
+  ACHIEVEMENTS,
+  type AchievementDefinition,
+} from '../content/achievements/achievements';
+import { ENCHANTS, RELIC_ENCHANT_COST } from '../content/enchants/enchants';
+import {
+  GEMS,
+  getRelicRefineCost,
+  makeGemKey,
+  MAX_RELIC_RANK,
+  parseGemKey,
+  RELIC_SOCKET_COST,
+  type GemTypeId,
+} from '../content/gems/gems';
+import {
+  CHALLENGE_MODIFIER_MAP,
+  type ChallengeModifierId,
+} from '../content/modifiers/modifiers';
+import {
+  getTalentTotalInvested,
+  getTalentUpgradeCost,
+  TALENT_MAP,
+  type TalentId,
+} from '../content/talents/talents';
 import { translateContent, translateUi } from '../i18n/i18n';
 import { InputController } from '../input/InputController';
 import { CameraController } from '../scene/CameraController';
@@ -101,11 +129,13 @@ export class GameRuntime {
       arenaShape: 'circle',
       levelName: '',
       state: 'menu',
+      endlessMode: false,
       hp: 0,
       maxHp: 1,
       shield: 0,
       maxShield: 0,
       relicCount: 0,
+      relicIds: [],
       xp: 0,
       xpToNext: 1,
       level: 1,
@@ -119,6 +149,7 @@ export class GameRuntime {
       dashReadyRatio: 1,
       guardReadyRatio: 1,
       furyRatio: 0,
+      attackReadyRatio: 1,
       weaponSlots: [],
       maxWeaponSlots: 3,
       boss: null,
@@ -185,6 +216,223 @@ export class GameRuntime {
 
   public getSaveData(): Readonly<SaveData> {
     return this.saveData;
+  }
+
+  public getRelicCatalog() {
+    return this.registries.equipment.list();
+  }
+
+  public getAchievements(): readonly AchievementDefinition[] {
+    return ACHIEVEMENTS;
+  }
+
+  public upgradeTalent(talentId: TalentId): boolean {
+    const def = TALENT_MAP.get(talentId);
+    if (!def) return false;
+    const cur = Math.max(0, Math.floor(this.saveData.talents[talentId] ?? 0));
+    if (cur >= def.maxLevel) return false;
+    const cost = getTalentUpgradeCost(def, cur);
+    if (this.saveData.stars < cost) return false;
+    this.saveData.stars -= cost;
+    this.saveData.talents[talentId] = cur + 1;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public resetTalents(): boolean {
+    const refund = getTalentTotalInvested(this.saveData.talents);
+    if (refund <= 0) return false;
+    this.saveData.stars += refund;
+    this.saveData.talents = {};
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public isLevelUnlocked(levelId: string, bypass = false): boolean {
+    if (bypass) return true;
+    const lvl = this.registries.levels.get(levelId);
+    if (!lvl || !lvl.visibleInMenu) return Boolean(lvl);
+    if ((this.saveData.bestVictorySecByLevel[levelId] ?? 0) > 0) return true;
+    const mode: GameModeKey =
+      lvl.modeGroup ?? (lvl.arenaShape === 'bridge' ? 'defense' : 'survival');
+    const ordered = this.getLevelsByMode(mode);
+    const idx = ordered.findIndex((l) => l.id === levelId);
+    if (idx <= 0) return true;
+    const prev = ordered[idx - 1];
+    return (this.saveData.bestVictorySecByLevel[prev.id] ?? 0) > 0;
+  }
+
+  public getCharacters(): readonly CharacterDefinition[] {
+    return this.registries.characters.list();
+  }
+
+  public selectCharacter(characterId: string): boolean {
+    if (!this.registries.characters.get(characterId)) return false;
+    if (!this.saveData.unlockedCharacters.includes(characterId)) return false;
+    this.saveData.selectedCharacterId = characterId;
+    this.storage.save(this.saveData);
+    if (this.fsm.state === 'menu' && this.menuPreviewMode) {
+      const mode = this.menuPreviewMode;
+      this.menuPreviewMode = null;
+      this.setMenuPreviewMode(mode);
+    }
+    return true;
+  }
+
+  public unlockCharacter(characterId: string): boolean {
+    if (!this.registries.characters.get(characterId)) return false;
+    if (this.saveData.unlockedCharacters.includes(characterId)) return false;
+    const shards = this.saveData.characterShards[characterId] ?? 0;
+    if (shards >= 20) {
+      this.saveData.characterShards[characterId] = shards - 20;
+    } else if (this.saveData.stars >= 25) {
+      this.saveData.stars -= 25;
+    } else {
+      return false;
+    }
+    this.saveData.unlockedCharacters.push(characterId);
+    this.saveData.characterStars[characterId] = Math.max(
+      1,
+      this.saveData.characterStars[characterId] ?? 1
+    );
+    this.saveData.selectedCharacterId = characterId;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public starUpCharacter(characterId: string): boolean {
+    if (!this.saveData.unlockedCharacters.includes(characterId)) return false;
+    const curStar = Math.max(1, Math.floor(this.saveData.characterStars[characterId] ?? 1));
+    if (curStar >= 5) return false;
+    const shardCost = curStar * 10;
+    const starCost = curStar * 22;
+    const ownedShards = this.saveData.characterShards[characterId] ?? 0;
+    if (ownedShards >= shardCost) {
+      this.saveData.characterShards[characterId] = ownedShards - shardCost;
+    } else if (this.saveData.stars >= starCost) {
+      this.saveData.stars -= starCost;
+    } else {
+      return false;
+    }
+    this.saveData.characterStars[characterId] = curStar + 1;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public unlockSecondLoadoutSlot(): boolean {
+    if (this.saveData.loadoutSlotsUnlocked >= 2) return false;
+    if (this.saveData.stars < 40) return false;
+    this.saveData.stars -= 40;
+    this.saveData.loadoutSlotsUnlocked = 2;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public toggleLoadoutRelic(relicId: string): boolean {
+    if (!this.saveData.discoveredRelics.includes(relicId)) return false;
+    const idx = this.saveData.loadoutRelicIds.indexOf(relicId);
+    if (idx >= 0) {
+      this.saveData.loadoutRelicIds.splice(idx, 1);
+    } else {
+      if (this.saveData.loadoutRelicIds.length >= this.saveData.loadoutSlotsUnlocked) {
+        return false;
+      }
+      this.saveData.loadoutRelicIds.push(relicId);
+    }
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public refineRelic(relicId: string): boolean {
+    if (!this.saveData.discoveredRelics.includes(relicId)) return false;
+    const curRank = Math.max(0, Math.floor(this.saveData.relicRanks[relicId] ?? 0));
+    if (curRank >= MAX_RELIC_RANK) return false;
+    const cost = getRelicRefineCost(curRank);
+    if (this.saveData.stars < cost) return false;
+    this.saveData.stars -= cost;
+    this.saveData.relicRanks[relicId] = curRank + 1;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public unlockRelicSocket(relicId: string): boolean {
+    if (!this.saveData.discoveredRelics.includes(relicId)) return false;
+    if (Object.prototype.hasOwnProperty.call(this.saveData.relicSockets, relicId)) return false;
+    if (this.saveData.stars < RELIC_SOCKET_COST) return false;
+    this.saveData.stars -= RELIC_SOCKET_COST;
+    this.saveData.relicSockets[relicId] = null;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public socketGem(relicId: string, gemKey: string): boolean {
+    if (!this.saveData.discoveredRelics.includes(relicId)) return false;
+    if (!Object.prototype.hasOwnProperty.call(this.saveData.relicSockets, relicId)) return false;
+    if (!parseGemKey(gemKey)) return false;
+    const owned = this.saveData.gemInventory[gemKey] ?? 0;
+    if (owned <= 0) return false;
+
+    const prevKey = this.saveData.relicSockets[relicId];
+    if (prevKey === gemKey) return false;
+    if (prevKey) {
+      this.saveData.gemInventory[prevKey] = (this.saveData.gemInventory[prevKey] ?? 0) + 1;
+    }
+    if (owned === 1) {
+      delete this.saveData.gemInventory[gemKey];
+    } else {
+      this.saveData.gemInventory[gemKey] = owned - 1;
+    }
+    this.saveData.relicSockets[relicId] = gemKey;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public unsocketGem(relicId: string): boolean {
+    const prevKey = this.saveData.relicSockets[relicId];
+    if (!prevKey) return false;
+    this.saveData.gemInventory[prevKey] = (this.saveData.gemInventory[prevKey] ?? 0) + 1;
+    this.saveData.relicSockets[relicId] = null;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public fuseGem(type: GemTypeId, tier: 1 | 2): boolean {
+    const srcKey = makeGemKey(type, tier);
+    const owned = this.saveData.gemInventory[srcKey] ?? 0;
+    if (owned < 3) return false;
+    if (owned === 3) {
+      delete this.saveData.gemInventory[srcKey];
+    } else {
+      this.saveData.gemInventory[srcKey] = owned - 3;
+    }
+    const nextKey = makeGemKey(type, (tier + 1) as 2 | 3);
+    this.saveData.gemInventory[nextKey] = (this.saveData.gemInventory[nextKey] ?? 0) + 1;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public enchantRelic(relicId: string): boolean {
+    if (!this.saveData.discoveredRelics.includes(relicId)) return false;
+    if (this.saveData.stars < RELIC_ENCHANT_COST) return false;
+    const current = this.saveData.relicEnchants[relicId];
+    const pool = ENCHANTS.filter((e) => e.id !== current);
+    const chosen = pool[Math.floor(Math.random() * pool.length)] ?? ENCHANTS[0];
+    this.saveData.stars -= RELIC_ENCHANT_COST;
+    this.saveData.relicEnchants[relicId] = chosen.id;
+    this.storage.save(this.saveData);
+    return true;
+  }
+
+  public toggleModifier(modifierId: ChallengeModifierId): boolean {
+    if (!CHALLENGE_MODIFIER_MAP.has(modifierId)) return false;
+    const idx = this.saveData.activeModifiers.indexOf(modifierId);
+    if (idx >= 0) {
+      this.saveData.activeModifiers.splice(idx, 1);
+    } else {
+      this.saveData.activeModifiers.push(modifierId);
+    }
+    this.storage.save(this.saveData);
+    return true;
   }
 
   public getSettings(): Readonly<GameSettings> {
@@ -286,6 +534,9 @@ export class GameRuntime {
 
   private applyQualityProfile(tier: QualityTier): void {
     const profile = QUALITY_PROFILES[tier];
+    if (this.session) {
+      this.session.vfxScale = profile.maxVfxMultiplier;
+    }
     if (this.renderer) {
       this.renderer.shadowMap.enabled = profile.shadowsEnabled;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -336,6 +587,9 @@ export class GameRuntime {
         break;
       case 'triggerFury':
         this.input.queueFury();
+        break;
+      case 'triggerAttack':
+        this.input.queueAttack();
         break;
       case 'setQuality':
         this.saveData.settings.quality = cmd.quality;
@@ -391,9 +645,25 @@ export class GameRuntime {
 
     this.sessionSeq += 1;
     this.activeLevelId = levelId;
-    this.session = new GameSession(this.sessionSeq, level, this.registries);
+    this.session = new GameSession(
+      this.sessionSeq,
+      level,
+      this.registries,
+      this.saveData.selectedCharacterId
+    );
     this.session.language = this.saveData.settings.language;
     this.session.godMode = this.debugGodMode;
+    this.session.vfxScale = QUALITY_PROFILES[this.saveData.settings.quality].maxVfxMultiplier;
+    this.session.setModifiers(this.saveData.activeModifiers);
+    this.upgradeSys.applyMetaTalents(
+      this.session,
+      this.saveData.talents,
+      this.saveData.characterStars,
+      this.saveData.loadoutRelicIds,
+      this.saveData.relicRanks,
+      this.saveData.relicSockets,
+      this.saveData.relicEnchants
+    );
     if (level.arenaShape === 'bridge') {
       this.session.player.facingRad = Math.PI;
     }
@@ -464,6 +734,33 @@ export class GameRuntime {
     }
   }
 
+  public enterEndlessMode(): boolean {
+    const s = this.session;
+    if (!s || !this.fsm.enterEndlessFromVictory()) return false;
+    s.endlessMode = true;
+    s.endlessStartedAtSec = s.elapsedSec;
+    s.endlessWaveLevel = 1;
+    s.endlessBossTimer = 50;
+    s.bossKilled = false;
+    s.bossSpawned = false;
+    s.player.hp = Math.min(s.player.maxHp, s.player.hp + s.player.maxHp * 0.5);
+    this.clock.resetTimeBaseline(performance.now());
+    this.input.setEnabled(true);
+    this.emitStateAndHud();
+    return true;
+  }
+
+  public extractEndlessRun(): boolean {
+    const s = this.session;
+    if (!s || !s.endlessMode || this.fsm.isTerminal()) return false;
+    this.finishRun(
+      s,
+      true,
+      translateUi(this.saveData.settings.language, 'res.endlessExtractReason')
+    );
+    return true;
+  }
+
   public exitToMenu(): void {
     this.input.setEnabled(false);
     this.menuPreviewMode = null;
@@ -494,7 +791,9 @@ export class GameRuntime {
     this.menuPreviewMode = mode;
     const previewLevel = this.getLevelsByMode(mode)[0];
     if (!previewLevel || !this.arena) return;
-    const ch = this.registries.characters.get(previewLevel.characterId);
+    const ch =
+      this.registries.characters.get(this.saveData.selectedCharacterId) ??
+      this.registries.characters.get(previewLevel.characterId);
     if (!ch) return;
 
     this.entityRenderer?.hideAll();
@@ -653,7 +952,10 @@ export class GameRuntime {
       this.clock.simTimeSec,
       this.saveData.settings.language,
       this.session.beams,
-      this.session.shockwaves
+      this.session.shockwaves,
+      this.session.bridgeBarrel,
+      this.session.hazardZone,
+      this.session.bridgeMeteor
     );
   }
 
@@ -729,6 +1031,9 @@ export class GameRuntime {
     }
     if (session.player.furyCharge >= 100 && this.input.consumeFury()) {
       this.combat.triggerFuryUltimate(session, this.sound);
+    }
+    if (session.player.attackCooldown <= 0 && this.input.consumeAttack()) {
+      this.combat.triggerManualAttack(session, this.sound);
     }
     this.input.tickBuffers(dt);
     this.enemyWave.update(session, dt, viewBounds, this.combat, this.sound);
@@ -815,8 +1120,52 @@ export class GameRuntime {
       sessionId: session.sessionId,
       requestId: session.activeUpgradeRequestId,
       playerLevel: session.player.level,
+      rerollsRemaining: session.rerollsRemaining,
       choices: session.activeUpgradeChoices,
     });
+  }
+
+  public rerollLevelUp(requestId: number): boolean {
+    const session = this.session;
+    if (!session || this.fsm.state !== 'level-up') return false;
+    if (session.activeUpgradeRequestId !== requestId) return false;
+    if (session.rerollsRemaining <= 0) return false;
+
+    session.rerollsRemaining -= 1;
+    session.upgradeRequestSeq += 1;
+    session.activeUpgradeRequestId = session.upgradeRequestSeq;
+    session.activeUpgradeChoices = this.upgradeSys.generateChoices(session, 3);
+    this.sound.playReroll();
+    this.events.emit('levelUpRequest', {
+      sessionId: session.sessionId,
+      requestId: session.activeUpgradeRequestId,
+      playerLevel: session.player.level,
+      rerollsRemaining: session.rerollsRemaining,
+      choices: session.activeUpgradeChoices,
+    });
+    return true;
+  }
+
+  public skipLevelUp(requestId: number): boolean {
+    const session = this.session;
+    if (!session || this.fsm.state !== 'level-up') return false;
+    if (session.activeUpgradeRequestId !== requestId) return false;
+
+    session.activeUpgradeRequestId = 0;
+    session.activeUpgradeChoices = [];
+    session.player.hp = Math.min(
+      session.player.maxHp,
+      session.player.hp + session.player.maxHp * 0.1
+    );
+    session.player.furyCharge = Math.min(100, session.player.furyCharge + 10);
+    this.sound.playSupply();
+
+    if (session.pendingLevelUps > 0) {
+      this.triggerNextLevelUp(session);
+      return true;
+    }
+    this.resume('level-up');
+    return true;
   }
 
   private handleChooseUpgrade(sessionId: number, requestId: number, upgradeId: string): void {
@@ -841,6 +1190,7 @@ export class GameRuntime {
   }
 
   private finishRun(session: GameSession, victory: boolean, reason: string): void {
+    if (this.fsm.state === 'victory' || this.fsm.state === 'game-over') return;
     this.input.setEnabled(false);
     this.fsm.setState(victory ? 'victory' : 'game-over');
 
@@ -857,13 +1207,88 @@ export class GameRuntime {
       this.saveData.bestSurvivalSecByLevel[levelId] = session.elapsedSec;
       isNewBest = true;
     }
-    if (victory) {
+    if (victory && !session.endlessMode) {
       this.saveData.victories += 1;
       const prevFastest = this.saveData.bestVictorySecByLevel[levelId];
       if (prevFastest === undefined || session.elapsedSec < prevFastest) {
         this.saveData.bestVictorySecByLevel[levelId] = session.elapsedSec;
       }
     }
+    if (session.endlessMode) {
+      const prevEndless = this.saveData.bestEndlessSecByLevel[levelId] ?? 0;
+      if (session.elapsedSec > prevEndless) {
+        this.saveData.bestEndlessSecByLevel[levelId] = session.elapsedSec;
+      }
+    }
+
+    const greedLvl = Math.max(0, Math.floor(this.saveData.talents.greed ?? 0));
+    let starBonusPct = greedLvl * 15;
+    for (const mid of this.saveData.activeModifiers) {
+      const mDef = CHALLENGE_MODIFIER_MAP.get(mid);
+      if (mDef) starBonusPct += mDef.starBonusPct;
+    }
+    const starMult = 1 + starBonusPct / 100;
+    const baseStars = Math.max(
+      1,
+      Math.floor(session.player.kills / 12) +
+        Math.floor(session.elapsedSec / 35) +
+        (victory ? 12 : 0) +
+        (session.endlessMode ? session.endlessWaveLevel * 4 + session.endlessBossKills * 5 : 0)
+    );
+    const earnedStars = Math.max(1, Math.round(baseStars * starMult));
+    this.saveData.stars += earnedStars;
+    this.saveData.totalStarsEarned += earnedStars;
+
+    // Grant hero shards based on run performance & stage tier
+    const stageBonus = Math.max(0, (session.level.stageOrder ?? 1) - 1);
+    const activeShards =
+      1 + (victory ? 2 : 0) + stageBonus + (session.endlessMode ? session.endlessBossKills : 0);
+    const activeCharId = session.character.id;
+    const earnedShards: Record<string, number> = { [activeCharId]: activeShards };
+    if (
+      victory &&
+      (session.level.stageOrder ?? 99) === 1 &&
+      session.level.arenaShape !== 'bridge' &&
+      !this.saveData.unlockedCharacters.includes('storm-ranger')
+    ) {
+      earnedShards['storm-ranger'] = (earnedShards['storm-ranger'] ?? 0) + 6;
+    } else if (
+      victory &&
+      (session.level.stageOrder ?? 99) === 1 &&
+      session.level.arenaShape === 'bridge' &&
+      !this.saveData.unlockedCharacters.includes('iron-bastion')
+    ) {
+      earnedShards['iron-bastion'] = (earnedShards['iron-bastion'] ?? 0) + 6;
+    }
+    for (const [cid, amt] of Object.entries(earnedShards)) {
+      this.saveData.characterShards[cid] = (this.saveData.characterShards[cid] ?? 0) + amt;
+    }
+
+    // Grant gem drops on victory or endless boss kills
+    const earnedGems: Record<string, number> = {};
+    const gemDrops = (victory ? 1 : 0) + Math.min(2, session.endlessBossKills);
+    for (let i = 0; i < gemDrops; i += 1) {
+      const gemDef = GEMS[session.rng.int(0, GEMS.length)];
+      const gKey = makeGemKey(gemDef.id, 1);
+      earnedGems[gKey] = (earnedGems[gKey] ?? 0) + 1;
+      this.saveData.gemInventory[gKey] = (this.saveData.gemInventory[gKey] ?? 0) + 1;
+    }
+
+    // Record discovered relics & evolved weapons + evaluate milestone achievements
+    const newlyDiscoveredRelicIds: string[] = [];
+    for (const rid of session.player.equippedRelics) {
+      if (!this.saveData.discoveredRelics.includes(rid)) {
+        this.saveData.discoveredRelics.push(rid);
+        newlyDiscoveredRelicIds.push(rid);
+      }
+    }
+    for (const w of session.player.weapons) {
+      if (w.mechanisms.size > 0 && !this.saveData.discoveredEvolvedWeapons.includes(w.weaponId)) {
+        this.saveData.discoveredEvolvedWeapons.push(w.weaponId);
+      }
+    }
+    this.evaluateAchievements(session, victory);
+
     this.storage.save(this.saveData);
 
     this.emitStateAndHud();
@@ -879,10 +1304,37 @@ export class GameRuntime {
       kills: session.player.kills,
       playerLevel: session.player.level,
       weapons: this.buildWeaponSnapshots(session),
+      relicIds: [...session.player.equippedRelics],
+      newlyDiscoveredRelicIds,
       isNewBestTime: isNewBest,
+      isEndless: session.endlessMode,
+      earnedStars,
+      earnedShards,
+      earnedGems,
       reason,
     };
     this.events.emit('result', result);
+  }
+
+  private evaluateAchievements(session: GameSession, victory: boolean): void {
+    const unlock = (id: string) => {
+      if (this.saveData.unlockedAchievements.includes(id)) return;
+      this.saveData.unlockedAchievements.push(id);
+      const def = ACHIEVEMENTS.find((a) => a.id === id);
+      if (def) {
+        this.saveData.stars += def.rewardStars;
+        this.saveData.totalStarsEarned += def.rewardStars;
+      }
+    };
+
+    if (victory || this.saveData.victories > 0) unlock('first-victory');
+    if (session.player.kills >= 250) unlock('slayer-250');
+    if (session.player.kills >= 600) unlock('slayer-600');
+    if (this.saveData.discoveredRelics.length >= 10) unlock('relic-collector-10');
+    if (this.saveData.discoveredRelics.length >= 20) unlock('relic-collector-20');
+    if (this.saveData.discoveredEvolvedWeapons.length >= 3) unlock('synergy-master');
+    if (session.endlessMode) unlock('endless-explorer');
+    if (victory && this.saveData.activeModifiers.length > 0) unlock('challenge-victor');
   }
 
   private emitStateAndHud(): void {
@@ -938,7 +1390,14 @@ export class GameRuntime {
     let stageId = stage?.id ?? 'stage-1-warmup';
     let stageLabel = stage?.label ?? '战斗阶段';
     let stageProgress = Math.min(1, session.elapsedSec / Math.max(1, bossCfg.triggerSec));
-    if (session.elapsedSec >= bossCfg.triggerSec) {
+    if (session.endlessMode) {
+      stageId = 'endless-mode';
+      stageLabel =
+        session.language === 'en'
+          ? `Endless Abyss · Tier ${session.endlessWaveLevel}`
+          : `无尽深渊 · 第 ${session.endlessWaveLevel} 阶`;
+      stageProgress = 1;
+    } else if (session.elapsedSec >= bossCfg.triggerSec) {
       stageId = bossCfg.bossEnemyId;
       stageLabel = bossCfg.label;
       stageProgress = 1;
@@ -992,17 +1451,26 @@ export class GameRuntime {
 
     const maxDashCd = Math.max(0.1, MovementSystem.DASH_COOLDOWN * p.dashCooldownMult);
     const maxGuardCd = Math.max(0.2, CombatSystem.GUARD_COOLDOWN * p.dashCooldownMult);
+    const maxAttackCd = Math.max(
+      0.15,
+      CombatSystem.MANUAL_ATTACK_COOLDOWN / Math.max(0.6, p.attackSpeedMult)
+    );
 
     snap.sessionId = session.sessionId;
     snap.levelId = session.level.id;
     snap.arenaShape = session.level.arenaShape ?? 'circle';
     snap.levelName = session.level.name;
     snap.state = this.fsm.state;
+    snap.endlessMode = session.endlessMode;
     snap.hp = Math.ceil(p.hp);
     snap.maxHp = p.maxHp;
     snap.shield = Math.ceil(p.shield);
     snap.maxShield = Math.ceil(p.maxShield);
     snap.relicCount = p.equippedRelics.length;
+    snap.relicIds.length = 0;
+    for (let i = 0; i < p.equippedRelics.length; i += 1) {
+      snap.relicIds.push(p.equippedRelics[i]);
+    }
     snap.xp = p.xp;
     snap.xpToNext = p.xpToNext;
     snap.level = p.level;
@@ -1016,6 +1484,7 @@ export class GameRuntime {
     snap.dashReadyRatio = Math.max(0, Math.min(1, 1 - p.dashCooldown / maxDashCd));
     snap.guardReadyRatio = Math.max(0, Math.min(1, 1 - p.guardCooldown / maxGuardCd));
     snap.furyRatio = Math.max(0, Math.min(1, p.furyCharge / 100));
+    snap.attackReadyRatio = Math.max(0, Math.min(1, 1 - p.attackCooldown / maxAttackCd));
     this.fillWeaponSnapshots(session, snap.weaponSlots);
     snap.maxWeaponSlots = session.level.weaponSlotCount;
     snap.boss = boss;
@@ -1191,6 +1660,10 @@ export class GameRuntime {
     s.elapsedSec = Math.max(s.elapsedSec, s.level.bossStage.triggerSec);
     if (!s.bossSpawned) {
       this.enemyWave.update(s, 0.016, this.cameraCtrl.getGroundViewBounds(), this.combat, this.sound);
+    }
+    if (s.bossSpawned) {
+      s.bridgeGates[0].active = false;
+      s.bridgeGates[1].active = false;
     }
     this.syncVisualsNow(0);
     this.emitStateAndHud();

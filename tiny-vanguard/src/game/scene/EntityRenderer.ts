@@ -6,9 +6,12 @@ import { DEBUFF_BY_ID } from '../content/effects/debuffs';
 import type { LanguageCode } from '../core/GameTypes';
 import type { ObjectPool } from '../pool/ObjectPool';
 import type {
+  BridgeBarrelState,
   BridgeGateState,
+  BridgeMeteorState,
   DropEntity,
   EnemyEntity,
+  HazardZoneState,
   ProjectileEntity,
   SupplyCrateState,
   VfxBeam,
@@ -846,6 +849,10 @@ export class EntityRenderer {
   private readonly bossSlamFill: THREE.Mesh;
 
   private readonly supplyGroup: THREE.Group;
+  private readonly barrelGroup: THREE.Group;
+  private readonly hazardGroup: THREE.Group;
+  private readonly hazardDiscMat: THREE.MeshBasicMaterial;
+  private readonly meteorGroup: THREE.Group;
   private readonly supplyRing: THREE.Mesh;
   private readonly supplyPillarMat: THREE.ShaderMaterial;
   private readonly gateGroups: [THREE.Group, THREE.Group];
@@ -1389,6 +1396,99 @@ export class EntityRenderer {
     });
     scene.add(this.supplyGroup);
 
+    // Explosive Bridge Barrel (Iron Viaduct)
+    this.barrelGroup = new THREE.Group();
+    const barrelBodyGeo = this.track(new THREE.CylinderGeometry(0.42, 0.44, 0.96, 12));
+    const barrelBodyMat = this.track(
+      new THREE.MeshStandardMaterial({
+        color: 0xdc2626,
+        emissive: 0x7f1d1d,
+        emissiveIntensity: 0.45,
+        roughness: 0.45,
+        metalness: 0.35,
+      })
+    );
+    const barrelBody = new THREE.Mesh(barrelBodyGeo, barrelBodyMat);
+    barrelBody.position.y = 0.5;
+    barrelBody.castShadow = true;
+    const barrelBandGeo = this.track(new THREE.TorusGeometry(0.45, 0.045, 6, 16));
+    const barrelBandMat = this.track(
+      new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.5, metalness: 0.7 })
+    );
+    const bandTop = new THREE.Mesh(barrelBandGeo, barrelBandMat);
+    bandTop.rotation.x = Math.PI * 0.5;
+    bandTop.position.y = 0.78;
+    const bandBot = new THREE.Mesh(barrelBandGeo, barrelBandMat);
+    bandBot.rotation.x = Math.PI * 0.5;
+    bandBot.position.y = 0.24;
+    const hazardRingGeo = this.track(new THREE.RingGeometry(0.65, 0.85, 20));
+    const hazardRingMat = this.track(
+      new THREE.MeshBasicMaterial({
+        color: 0xf97316,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    const hazardRing = new THREE.Mesh(hazardRingGeo, hazardRingMat);
+    hazardRing.rotation.x = -Math.PI * 0.5;
+    hazardRing.position.y = 0.05;
+    this.barrelGroup.add(barrelBody, bandTop, bandBot, hazardRing);
+    this.barrelGroup.visible = false;
+    scene.add(this.barrelGroup);
+
+    // Astral Throne Void Hazard Zone
+    this.hazardGroup = new THREE.Group();
+    const hzRingGeo = this.track(new THREE.RingGeometry(3.85, 4.2, 32));
+    const hzRingMat = this.track(
+      new THREE.MeshBasicMaterial({
+        color: 0xe879f9,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    const hzRing = new THREE.Mesh(hzRingGeo, hzRingMat);
+    hzRing.rotation.x = -Math.PI * 0.5;
+    hzRing.position.y = 0.06;
+    const hzDiscGeo = this.track(new THREE.CircleGeometry(4.0, 28));
+    this.hazardDiscMat = this.track(
+      new THREE.MeshBasicMaterial({
+        color: 0x7c3aed,
+        transparent: true,
+        opacity: 0.25,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    const hzDisc = new THREE.Mesh(hzDiscGeo, this.hazardDiscMat);
+    hzDisc.rotation.x = -Math.PI * 0.5;
+    hzDisc.position.y = 0.04;
+    this.hazardGroup.add(hzDisc, hzRing);
+    this.hazardGroup.visible = false;
+    scene.add(this.hazardGroup);
+
+    // Abyss Span Shootable Boss Meteor
+    this.meteorGroup = new THREE.Group();
+    const metGeo = this.track(new THREE.IcosahedronGeometry(0.75, 0));
+    const metMat = this.track(
+      new THREE.MeshStandardMaterial({
+        color: 0x581c87,
+        emissive: 0xc026d3,
+        emissiveIntensity: 0.75,
+        roughness: 0.35,
+        metalness: 0.2,
+      })
+    );
+    const metMesh = new THREE.Mesh(metGeo, metMat);
+    metMesh.position.y = 0.95;
+    metMesh.castShadow = true;
+    this.meteorGroup.add(metMesh);
+    this.meteorGroup.visible = false;
+    scene.add(this.meteorGroup);
+
     // Frameless Sci-Fi Holographic Laser Grate Gates (Left / Right)
     const emitterPodMat = this.track(
       new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.65, roughness: 0.25 })
@@ -1580,7 +1680,10 @@ export class EntityRenderer {
     simTimeSec: number,
     lang: LanguageCode = 'zh',
     beams?: ObjectPool<VfxBeam>,
-    shockwaves?: ObjectPool<VfxShockwave>
+    shockwaves?: ObjectPool<VfxShockwave>,
+    bridgeBarrel?: BridgeBarrelState,
+    hazardZone?: HazardZoneState,
+    bridgeMeteor?: BridgeMeteorState
   ): void {
     let slimeCount = 0;
     let boarCount = 0;
@@ -1887,6 +1990,39 @@ export class EntityRenderer {
       this.supplyPillarMat.uniforms.uTime.value = simTimeSec;
     } else {
       this.supplyGroup.visible = false;
+    this.barrelGroup.visible = false;
+    this.hazardGroup.visible = false;
+    this.meteorGroup.visible = false;
+    }
+
+    if (bridgeBarrel && bridgeBarrel.active) {
+      this.barrelGroup.visible = true;
+      this.barrelGroup.position.set(bridgeBarrel.x, 0, bridgeBarrel.z);
+      const pulse = 1 + Math.sin(simTimeSec * 8) * 0.08;
+      this.barrelGroup.scale.set(pulse, 1, pulse);
+    } else {
+      this.barrelGroup.visible = false;
+    }
+
+    if (hazardZone && hazardZone.active) {
+      this.hazardGroup.visible = true;
+      this.hazardGroup.position.set(hazardZone.x, 0, hazardZone.z);
+      const isTele = hazardZone.telegraphSec > 0;
+      this.hazardDiscMat.color.setHex(isTele ? 0xfbbf24 : 0x7c3aed);
+      this.hazardDiscMat.opacity = isTele
+        ? 0.14 + 0.08 * Math.sin(simTimeSec * 12)
+        : 0.34 + 0.08 * Math.sin(simTimeSec * 6);
+    } else {
+      this.hazardGroup.visible = false;
+    }
+
+    if (bridgeMeteor && bridgeMeteor.active) {
+      this.meteorGroup.visible = true;
+      this.meteorGroup.position.set(bridgeMeteor.x, 0, bridgeMeteor.z);
+      this.meteorGroup.rotation.y = simTimeSec * 2.4;
+      this.meteorGroup.rotation.x = simTimeSec * 1.7;
+    } else {
+      this.meteorGroup.visible = false;
     }
 
     for (let i = 0; i < 2; i += 1) {
@@ -1911,12 +2047,17 @@ export class EntityRenderer {
               ? 0xfde047
               : gate.chargeTier === 2
                 ? 0xc026d3
-                : 0xf59e0b
+                : gate.gateEffect === 'summon-drones'
+                  ? 0x06b6d4
+                  : gate.gateEffect === 'blast-wave'
+                    ? 0xf97316
+                    : 0xf59e0b
             : 0x0ea5e9;
         this.gateMaterials[i].color.setHex(beamHex);
         this.gateBeamMaterials[i].color.setHex(beamHex);
 
-        const displayPct = isCharge ? 100 - pct : pct;
+        const isMaxTier = isCharge && !isCorrupted && gate.chargeTier >= gate.maxChargeTier;
+        const displayPct = isMaxTier ? 100 : isCharge ? 100 - pct : pct;
         const gateText = lang === 'en' && gate.labelEn ? gate.labelEn : gate.label;
         const titleTxt = isCorrupted
           ? lang === 'en'
@@ -2033,6 +2174,9 @@ export class EntityRenderer {
     this.bossSlamRing.visible = false;
     this.bossSlamFill.visible = false;
     this.supplyGroup.visible = false;
+    this.barrelGroup.visible = false;
+    this.hazardGroup.visible = false;
+    this.meteorGroup.visible = false;
     this.gateGroups[0].visible = false;
     this.gateGroups[1].visible = false;
     for (let i = 0; i < this.lightningPool.length; i += 1) {
@@ -2058,6 +2202,9 @@ export class EntityRenderer {
     this.scene.remove(this.bossSlamRing);
     this.scene.remove(this.bossSlamFill);
     this.scene.remove(this.supplyGroup);
+    this.scene.remove(this.barrelGroup);
+    this.scene.remove(this.hazardGroup);
+    this.scene.remove(this.meteorGroup);
     this.scene.remove(this.gateGroups[0]);
     this.scene.remove(this.gateGroups[1]);
     for (const d of this.disposables) {

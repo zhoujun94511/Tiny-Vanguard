@@ -12,6 +12,7 @@ export class InputController {
   private dashBufferSec = 0;
   private furyBufferSec = 0;
   private guardBufferSec = 0;
+  private attackBufferSec = 0;
   private enabled = false;
   private disposed = false;
 
@@ -33,7 +34,21 @@ export class InputController {
       if (!e.repeat) this.furyBufferSec = INPUT_BUFFER_SEC;
       return;
     }
+    if (code === 'KeyJ') {
+      if (!e.repeat) this.attackBufferSec = INPUT_BUFFER_SEC;
+      return;
+    }
     if (code === 'KeyW' || code === 'KeyA' || code === 'KeyS' || code === 'KeyD') {
+      this.keysDown.add(code);
+      return;
+    }
+    if (
+      code === 'ArrowUp' ||
+      code === 'ArrowDown' ||
+      code === 'ArrowLeft' ||
+      code === 'ArrowRight'
+    ) {
+      e.preventDefault();
       this.keysDown.add(code);
     }
   };
@@ -85,6 +100,7 @@ export class InputController {
     this.dashBufferSec = 0;
     this.furyBufferSec = 0;
     this.guardBufferSec = 0;
+    this.attackBufferSec = 0;
   }
 
   public queueDash(): void {
@@ -97,6 +113,10 @@ export class InputController {
 
   public queueGuard(): void {
     if (this.enabled) this.guardBufferSec = INPUT_BUFFER_SEC;
+  }
+
+  public queueAttack(): void {
+    if (this.enabled) this.attackBufferSec = INPUT_BUFFER_SEC;
   }
 
   public hasBufferedDash(): boolean {
@@ -129,10 +149,17 @@ export class InputController {
     return true;
   }
 
+  public consumeAttack(): boolean {
+    if (this.attackBufferSec <= 0) return false;
+    this.attackBufferSec = 0;
+    return true;
+  }
+
   public tickBuffers(dt: number): void {
     if (this.dashBufferSec > 0) this.dashBufferSec = Math.max(0, this.dashBufferSec - dt);
     if (this.furyBufferSec > 0) this.furyBufferSec = Math.max(0, this.furyBufferSec - dt);
     if (this.guardBufferSec > 0) this.guardBufferSec = Math.max(0, this.guardBufferSec - dt);
+    if (this.attackBufferSec > 0) this.attackBufferSec = Math.max(0, this.attackBufferSec - dt);
   }
 
   /**
@@ -155,10 +182,10 @@ export class InputController {
 
     let kx = 0;
     let ky = 0;
-    if (this.keysDown.has('KeyA')) kx -= 1;
-    if (this.keysDown.has('KeyD')) kx += 1;
-    if (this.keysDown.has('KeyW')) ky -= 1;
-    if (this.keysDown.has('KeyS')) ky += 1;
+    if (this.keysDown.has('KeyA') || this.keysDown.has('ArrowLeft')) kx -= 1;
+    if (this.keysDown.has('KeyD') || this.keysDown.has('ArrowRight')) kx += 1;
+    if (this.keysDown.has('KeyW') || this.keysDown.has('ArrowUp')) ky -= 1;
+    if (this.keysDown.has('KeyS') || this.keysDown.has('ArrowDown')) ky += 1;
 
     if (kx !== 0 && ky !== 0) {
       const invSqrt2 = 0.70710678;

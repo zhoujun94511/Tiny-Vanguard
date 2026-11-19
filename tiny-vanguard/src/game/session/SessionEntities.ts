@@ -142,6 +142,34 @@ export interface SupplyCrateState {
 
 export type BridgeGateRewardKind = string;
 
+export interface BridgeBarrelState {
+  active: boolean;
+  x: number;
+  z: number;
+  hp: number;
+  maxHp: number;
+  radius: number;
+}
+
+export interface HazardZoneState {
+  active: boolean;
+  x: number;
+  z: number;
+  radius: number;
+  telegraphSec: number;
+  remainingSec: number;
+  tickTimer: number;
+}
+
+export interface BridgeMeteorState {
+  active: boolean;
+  x: number;
+  z: number;
+  hp: number;
+  maxHp: number;
+  radius: number;
+}
+
 export interface BridgeGateState {
   active: boolean;
   x: number;
@@ -150,6 +178,7 @@ export interface BridgeGateState {
   hp: number;
   maxHp: number;
   gateMode: 'break' | 'charge';
+  gateEffect: 'buff' | 'summon-drones' | 'blast-wave';
   corrupted: boolean;
   chargeTier: number;
   maxChargeTier: number;
@@ -185,6 +214,7 @@ export interface DirectCombatModifiers {
   dashCdReduction: number;
   furyGainBonus: number;
   pickupBonus: number;
+  bossDamageBonus: number;
   bonusStarBlasterCount: number;
   bonusStarBlasterPierce: number;
   imbuedDebuffs: Set<DebuffId>;
@@ -217,6 +247,10 @@ export interface PlayerRuntimeState {
   dashTimer: number;
   dashCooldown: number;
   guardCooldown: number;
+  attackCooldown: number;
+  bridgeDroneTimer: number;
+  bridgeDronePower: number;
+  bridgeDroneFireTimer: number;
   dashDirX: number;
   dashDirZ: number;
   furyCharge: number;

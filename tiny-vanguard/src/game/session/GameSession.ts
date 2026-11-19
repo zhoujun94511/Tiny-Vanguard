@@ -2,6 +2,7 @@ import { RUNTIME_CONFIG } from '../config/runtimeConfig';
 import type { CharacterDefinition, LevelDefinition } from '../content/definitions/ContentTypes';
 import type { ContentRegistries } from '../content/registries/ContentRegistry';
 import type { LanguageCode, UpgradeChoiceView } from '../core/GameTypes';
+import type { ChallengeModifierId } from '../content/modifiers/modifiers';
 import { SeededRandom } from '../core/SeededRandom';
 import { ObjectPool } from '../pool/ObjectPool';
 import { SpatialGrid } from '../spatial/SpatialGrid';
@@ -12,8 +13,11 @@ import {
   createEmptyProjectile,
   createEmptyShockwave,
   createEmptyVfx,
+  type BridgeBarrelState,
+  type BridgeMeteorState,
   type DropEntity,
   type EnemyEntity,
+  type HazardZoneState,
   type PlayerRuntimeState,
   type ProjectileEntity,
   type SupplyCrateState,
@@ -46,15 +50,22 @@ export class GameSession {
   public readonly player: PlayerRuntimeState;
   public readonly supply: SupplyCrateState;
   public readonly bridgeGates: [BridgeGateState, BridgeGateState];
+  public readonly bridgeBarrel: BridgeBarrelState;
+  public readonly hazardZone: HazardZoneState;
+  public readonly bridgeMeteor: BridgeMeteorState;
   public readonly damagePopups: DamagePopupSlot[];
   private damagePopupCursor = 0;
 
   public elapsedSec = 0;
+  public vfxScale = 1;
   public language: LanguageCode = 'zh';
   public godMode = false;
   public combo = 0;
   public comboTier = 0;
   public bridgeGateTimer = 10;
+  public bridgeBarrelTimer = 14;
+  public hazardSpawnTimer = 18;
+  public bridgeMeteorTimer = 9;
   public currentStageIndex = 0;
   public spawnTimer = 0;
   public eliteTimer = 0;
@@ -63,6 +74,14 @@ export class GameSession {
   public bossSpawned = false;
   public bossKilled = false;
   public bossReinforceTimer = 0;
+  public endlessMode = false;
+  public endlessStartedAtSec = 0;
+  public endlessWaveLevel = 1;
+  public endlessBossTimer = 50;
+  public endlessBossKills = 0;
+  public hasGlassCannon = false;
+  public hasDoubleElites = false;
+  public hasHyperHorde = false;
   public bossSlot = -1;
   public bossGen = 0;
 
@@ -70,6 +89,7 @@ export class GameSession {
   public upgradeRequestSeq = 0;
   public activeUpgradeRequestId = 0;
   public activeUpgradeChoices: UpgradeChoiceView[] = [];
+  public rerollsRemaining = 2;
 
   // Reusable scratch array for SpatialGrid queries
   public readonly queryScratch: number[] = [];
@@ -77,12 +97,16 @@ export class GameSession {
   constructor(
     sessionId: number,
     level: LevelDefinition,
-    registries: ContentRegistries
+    registries: ContentRegistries,
+    characterIdOverride?: string
   ) {
     this.sessionId = sessionId;
     this.level = level;
     this.registries = registries;
-    this.character = registries.characters.getOrThrow(level.characterId, 'Character');
+    this.character = registries.characters.getOrThrow(
+      characterIdOverride ?? level.characterId,
+      'Character'
+    );
     this.rng = new SeededRandom(level.seed ?? (Date.now() ^ sessionId));
 
     const caps = RUNTIME_CONFIG.defaultPoolCapacities;
@@ -125,6 +149,10 @@ export class GameSession {
       dashTimer: 0,
       dashCooldown: 0,
       guardCooldown: 0,
+      attackCooldown: 0,
+      bridgeDroneTimer: 0,
+      bridgeDronePower: 1,
+      bridgeDroneFireTimer: 0,
       dashDirX: 0,
       dashDirZ: -1,
       furyCharge: 0,
@@ -146,6 +174,7 @@ export class GameSession {
         dashCdReduction: 0,
         furyGainBonus: 0,
         pickupBonus: 0,
+        bossDamageBonus: 0,
         bonusStarBlasterCount: 0,
         bonusStarBlasterPierce: 0,
         imbuedDebuffs: new Set(),
@@ -165,9 +194,12 @@ export class GameSession {
     };
 
     this.bridgeGates = [
-      { active: false, x: -2.45, z: -20, halfWidth: 2.1, hp: 60, maxHp: 60, gateMode: 'break', corrupted: false, chargeTier: 1, maxChargeTier: 1, buffId: 'buff-dmg-25', rewardKind: 'buff-dmg-25', label: '+25% 伤害', labelEn: '+25% DMG' },
-      { active: false, x: 2.45, z: -20, halfWidth: 2.1, hp: 60, maxHp: 60, gateMode: 'charge', corrupted: false, chargeTier: 1, maxChargeTier: 3, buffId: 'buff-rate-20', rewardKind: 'buff-rate-20', label: '+20% 攻速', labelEn: '+20% SPD' },
+      { active: false, x: -2.45, z: -20, halfWidth: 2.1, hp: 60, maxHp: 60, gateMode: 'charge', gateEffect: 'buff', corrupted: false, chargeTier: 1, maxChargeTier: 3, buffId: 'buff-dmg-25', rewardKind: 'buff-dmg-25', label: '+25% 伤害', labelEn: '+25% DMG' },
+      { active: false, x: 2.45, z: -20, halfWidth: 2.1, hp: 60, maxHp: 60, gateMode: 'charge', gateEffect: 'buff', corrupted: false, chargeTier: 1, maxChargeTier: 3, buffId: 'buff-rate-20', rewardKind: 'buff-rate-20', label: '+20% 攻速', labelEn: '+20% SPD' },
     ];
+    this.bridgeBarrel = { active: false, x: 0, z: -12, hp: 40, maxHp: 40, radius: 0.72 };
+    this.hazardZone = { active: false, x: 0, z: 0, radius: 4.2, telegraphSec: 0, remainingSec: 0, tickTimer: 0 };
+    this.bridgeMeteor = { active: false, x: 0, z: -14, hp: 60, maxHp: 60, radius: 0.9 };
 
     this.damagePopups = Array.from({ length: 48 }, () => ({
       active: false,
@@ -204,13 +236,27 @@ export class GameSession {
     };
   }
 
+  public hasModifier(id: ChallengeModifierId): boolean {
+    if (id === 'glass-cannon') return this.hasGlassCannon;
+    if (id === 'double-elites') return this.hasDoubleElites;
+    return this.hasHyperHorde;
+  }
+
+  public setModifiers(ids: readonly ChallengeModifierId[]): void {
+    this.hasGlassCannon = ids.includes('glass-cannon');
+    this.hasDoubleElites = ids.includes('double-elites');
+    this.hasHyperHorde = ids.includes('hyper-horde');
+  }
+
   public computeXpToNext(level: number): number {
     const { base, growth, exponent } = this.level.xpCurve;
     return Math.round(base * Math.pow(growth, Math.pow(level - 1, exponent)));
   }
 
   public spawnVfxBurst(x: number, y: number, z: number, color: number, count = 5): void {
-    for (let i = 0; i < count; i += 1) {
+    const minBurst = count >= 2 ? 2 : 1;
+    const scaledCount = Math.max(minBurst, Math.round(count * this.vfxScale));
+    for (let i = 0; i < scaledCount; i += 1) {
       const p = this.vfx.acquire();
       if (!p) break;
       const ang = this.rng.range(0, Math.PI * 2);

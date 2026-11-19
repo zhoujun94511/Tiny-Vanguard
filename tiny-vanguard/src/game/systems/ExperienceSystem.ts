@@ -38,7 +38,8 @@ export class ExperienceSystem {
 
   public grantXp(session: GameSession, amount: number, sound: SoundEngine | null): void {
     const p = session.player;
-    p.xp += amount;
+    const xpGain = session.hasHyperHorde ? Math.max(1, Math.round(amount * 1.2)) : amount;
+    p.xp += xpGain;
     sound?.playXp(session.combo);
 
     while (p.xp >= p.xpToNext) {

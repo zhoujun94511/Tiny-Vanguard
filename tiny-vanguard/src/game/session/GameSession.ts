@@ -129,6 +129,8 @@ export class GameSession {
     this.player = {
       x: level.playerSpawn.x,
       z: level.playerSpawn.z,
+      prevX: level.playerSpawn.x,
+      prevZ: level.playerSpawn.z,
       facingRad: level.arenaShape === 'bridge' ? Math.PI : 0,
       isMoving: false,
       hp: this.character.baseHp,

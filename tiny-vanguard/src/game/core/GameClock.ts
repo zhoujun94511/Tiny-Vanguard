@@ -7,6 +7,8 @@ export interface ClockTickResult {
   rawDt: number;
   /** Fixed simulation steps to run this frame */
   steps: number;
+  /** Sub-step interpolation factor [0..1] for smooth high-refresh (120Hz/144Hz) rendering */
+  alpha: number;
 }
 
 export class GameClock {
@@ -24,6 +26,7 @@ export class GameClock {
     wallDt: 0,
     rawDt: 0,
     steps: 0,
+    alpha: 0,
   };
 
   constructor(
@@ -59,6 +62,7 @@ export class GameClock {
       this.tickResult.wallDt = 0;
       this.tickResult.rawDt = 0;
       this.tickResult.steps = 0;
+      this.tickResult.alpha = 0;
       return this.tickResult;
     }
 
@@ -71,6 +75,7 @@ export class GameClock {
       this.accumulator = 0;
       this.tickResult.rawDt = 0;
       this.tickResult.steps = 0;
+      this.tickResult.alpha = 0;
       return this.tickResult;
     }
 
@@ -90,6 +95,7 @@ export class GameClock {
 
     this.tickResult.rawDt = clampedDt;
     this.tickResult.steps = steps;
+    this.tickResult.alpha = Math.max(0, Math.min(1, this.accumulator / this.fixedStep));
     return this.tickResult;
   }
 }

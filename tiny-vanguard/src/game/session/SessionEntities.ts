@@ -223,6 +223,8 @@ export interface DirectCombatModifiers {
 export interface PlayerRuntimeState {
   x: number;
   z: number;
+  prevX: number;
+  prevZ: number;
   facingRad: number;
   isMoving: boolean;
   hp: number;

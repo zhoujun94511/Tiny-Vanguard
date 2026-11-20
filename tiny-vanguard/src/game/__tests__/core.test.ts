@@ -1650,4 +1650,18 @@ describe('Stage 3 Relic Enchantment & Resonance', () => {
     expect(resolveEffectiveMaxDpr('high', 'Mali-G57 MC2')).toBe(2.25);
     expect(resolveEffectiveMaxDpr('medium', 'Adreno (TM) 740')).toBe(1.75);
   });
+
+  it('outputs sub-step interpolation alpha in GameClock for 120Hz/144Hz smooth rendering', () => {
+    const clock = new GameClock();
+    clock.resetTimeBaseline(1000);
+    const frame1 = clock.tick(1008, true); // 8ms (~125Hz): 0 sim steps, alpha ~ 0.48
+    expect(frame1.steps).toBe(0);
+    expect(frame1.alpha).toBeGreaterThan(0.4);
+    expect(frame1.alpha).toBeLessThan(0.6);
+
+    const frame2 = clock.tick(1017, true); // +9ms -> 17ms total: 1 sim step, residual alpha ~ 0.02
+    expect(frame2.steps).toBe(1);
+    expect(frame2.alpha).toBeGreaterThanOrEqual(0);
+    expect(frame2.alpha).toBeLessThan(0.1);
+  });
 });

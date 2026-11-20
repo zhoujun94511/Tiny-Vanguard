@@ -881,7 +881,7 @@ export class GameRuntime {
       this.rafId = requestAnimationFrame(tick);
 
       const simulating = this.fsm.isSimulating() && this.session !== null;
-      const { wallDt, rawDt, steps } = this.clock.tick(nowMs, simulating);
+      const { wallDt, rawDt, steps, alpha } = this.clock.tick(nowMs, simulating);
       if (wallDt > 0.001 && wallDt < 0.5) {
         this.fpsSmoothed = this.fpsSmoothed * 0.9 + (1 / wallDt) * 0.1;
       }
@@ -920,9 +920,13 @@ export class GameRuntime {
             break;
           }
         }
-        this.cameraCtrl.setTarget(this.session.player.x, this.session.player.z);
+        const renderAlpha = this.debugTimeScale > 1 ? 1 : alpha;
+        const p = this.session.player;
+        const renderX = p.prevX + (p.x - p.prevX) * renderAlpha;
+        const renderZ = p.prevZ + (p.z - p.prevZ) * renderAlpha;
+        this.cameraCtrl.setTarget(renderX, renderZ);
         this.cameraCtrl.update(rawDt);
-        this.syncVisualsNow(rawDt);
+        this.syncVisualsNow(rawDt, renderAlpha);
 
         this.hudEmitTimer += rawDt;
         if (this.hudEmitTimer >= RUNTIME_CONFIG.hudUpdateIntervalSec) {
@@ -963,7 +967,7 @@ export class GameRuntime {
     this.rafId = requestAnimationFrame(tick);
   }
 
-  private syncVisualsNow(dt = 0): void {
+  private syncVisualsNow(dt = 0, alpha = 1): void {
     if (!this.session || !this.arena || !this.entityRenderer) return;
     let activeWeaponMask = 0;
     const weapons = this.session.player.weapons;
@@ -973,17 +977,21 @@ export class GameRuntime {
       else if (wid === 'rail-sniper') activeWeaponMask |= 2;
       else if (wid === 'frost-nova') activeWeaponMask |= 4;
     }
+    const p = this.session.player;
+    const renderX = p.prevX + (p.x - p.prevX) * alpha;
+    const renderZ = p.prevZ + (p.z - p.prevZ) * alpha;
+    const renderTimeSec = this.clock.simTimeSec + alpha * this.clock.fixedStep;
     this.arena.updatePlayerVisual(
-      this.session.player.x,
-      this.session.player.z,
-      this.session.player.facingRad,
-      this.session.player.isMoving,
-      this.clock.simTimeSec,
+      renderX,
+      renderZ,
+      p.facingRad,
+      p.isMoving,
+      renderTimeSec,
       dt,
-      this.session.player.hitFlashTimer > 0,
+      p.hitFlashTimer > 0,
       this.session.comboTier,
       activeWeaponMask,
-      this.session.player.equippedRelics.length
+      p.equippedRelics.length
     );
     this.entityRenderer.sync(
       this.session.enemies,
@@ -1068,6 +1076,8 @@ export class GameRuntime {
 
   private stepSimulation(session: GameSession, dt: number): void {
     const viewBounds = this.cameraCtrl.getGroundViewBounds();
+    session.player.prevX = session.player.x;
+    session.player.prevZ = session.player.z;
 
     this.movement.updatePlayer(session, this.input, dt, this.sound);
     if (session.player.guardCooldown <= 0 && this.input.consumeGuard()) {

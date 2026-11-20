@@ -2,6 +2,12 @@
 
 本文件记录《Tiny Vanguard》对外交付版本。版本号对应 `tiny-vanguard/package.json` 的 `version`。构建文件名为 `tiny-vanguard/dist/tiny-vanguard-<版本>-<YYYYMMDD-HHmmss>.html`，每次构建只保留最新一份并同步至 `docs/index.html`，页面内的 `<meta name="version">` 与 `<meta name="build-time">` 与文件名一致。
 
+## 1.2.3（高刷屏亚帧插值清晰度版） — 2026-11-20
+
+- **120Hz/144Hz 高刷屏亚帧渲染插值修复**：[GameClock.ts](tiny-vanguard/src/game/core/GameClock.ts)、[SessionEntities.ts](tiny-vanguard/src/game/session/SessionEntities.ts)、[GameSession.ts](tiny-vanguard/src/game/session/GameSession.ts) 与 [GameRuntime.ts](tiny-vanguard/src/game/core/GameRuntime.ts) 引入零 GC 亚帧插值因子 `alpha` 与角色 `prevX/prevZ` 插值，消除 120Hz/144Hz 手机屏幕上移动时的隔帧重影模糊；Vitest 单测扩充至 **66 项**全通过。
+
+---
+
 ## 1.2.2（移动端显示与 GPU 清晰度适配版） — 2026-11-20
 
 聚焦移动端小屏选关交互、42° 俯视角英雄辨识度与旗舰手机 GPU 清晰度适配。

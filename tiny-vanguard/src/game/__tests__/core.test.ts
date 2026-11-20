@@ -15,6 +15,7 @@ import {
   getTalentUpgradeCost,
   TALENT_MAP,
 } from '../content/talents/talents';
+import { resolveEffectiveMaxDpr } from '../config/qualityConfig';
 import { GameClock } from '../core/GameClock';
 import { GameRuntime } from '../core/GameRuntime';
 import { GameStateMachine } from '../core/GameStateMachine';
@@ -1640,5 +1641,13 @@ describe('Stage 3 Relic Enchantment & Resonance', () => {
     expect(bridge.instantClear()).toBe(true);
     expect(rt.enterEndlessMode()).toBe(true);
     rt.destroy();
+  });
+
+  it('unlocks full 3.0 DPR on flagship GPUs (Adreno 740 / Apple GPU) and caps legacy mobile GPUs', () => {
+    expect(resolveEffectiveMaxDpr('high', 'Adreno (TM) 740')).toBe(3.0);
+    expect(resolveEffectiveMaxDpr('high', 'Apple GPU')).toBe(3.0);
+    expect(resolveEffectiveMaxDpr('high', 'Adreno (TM) 610')).toBe(2.25);
+    expect(resolveEffectiveMaxDpr('high', 'Mali-G57 MC2')).toBe(2.25);
+    expect(resolveEffectiveMaxDpr('medium', 'Adreno (TM) 740')).toBe(1.75);
   });
 });

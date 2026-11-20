@@ -172,13 +172,18 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   const isRanger = def.id === 'storm-ranger';
   const isBastion = def.id === 'iron-bastion';
   if (isBastion) {
-    root.scale.setScalar(1.08);
+    root.scale.set(1.24, 1.14, 1.24);
+  } else if (isRanger) {
+    root.scale.set(0.9, 0.96, 0.9);
   }
 
-  const heroRingGeo = new THREE.RingGeometry(0.68, 0.78, 36);
+  const heroRingGeo = isBastion
+    ? new THREE.RingGeometry(0.68, 0.86, 36)
+    : new THREE.RingGeometry(0.68, 0.78, 36);
   heroRingGeo.rotateX(-Math.PI / 2);
   const energyHex = isRanger ? 0xa855f7 : isBastion ? 0xf97316 : 0x38bdf8;
-  const armorBaseHex = isRanger ? 0xbae6fd : isBastion ? 0x64748b : 0xe2e8f0;
+  const armorBaseHex = isRanger ? 0x1d4ed8 : isBastion ? 0xb45309 : 0xf8fafc;
+  const trimHex = isRanger ? 0xc084fc : isBastion ? 0xfb923c : def.primaryColor;
   const heroRingMat = new THREE.MeshBasicMaterial({
     color: energyHex,
     transparent: true,
@@ -213,13 +218,13 @@ export const defaultChibiCharacterBuilder: CharacterVisualBuilder = (def) => {
   );
   const goldTrimMat = applyFresnelRim(
     new THREE.MeshStandardMaterial({
-      color: def.primaryColor,
-      emissive: isBastion ? 0x9a3412 : isRanger ? 0x0369a1 : 0x78350f,
-      emissiveIntensity: 0.28,
+      color: trimHex,
+      emissive: isBastion ? 0x9a3412 : isRanger ? 0x6b21a8 : 0x78350f,
+      emissiveIntensity: 0.34,
       roughness: 0.22,
       metalness: 0.88,
     }),
-    def.primaryColor,
+    trimHex,
     2.2,
     0.55
   );

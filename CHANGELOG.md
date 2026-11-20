@@ -2,6 +2,16 @@
 
 本文件记录《Tiny Vanguard》对外交付版本。版本号对应 `tiny-vanguard/package.json` 的 `version`。构建文件名为 `tiny-vanguard/dist/tiny-vanguard-<版本>-<YYYYMMDD-HHmmss>.html`，每次构建只保留最新一份并同步至 `docs/index.html`，页面内的 `<meta name="version">` 与 `<meta name="build-time">` 与文件名一致。
 
+## 1.2.2（移动端显示与 GPU 清晰度适配版） — 2026-11-20
+
+聚焦移动端小屏选关交互、42° 俯视角英雄辨识度与旗舰手机 GPU 清晰度适配。
+
+- **小屏选关界面滑动与词缀排布修复**：修复 [LevelSelect.vue](tiny-vanguard/src/components/game/LevelSelect.vue) 小屏模式下无法上下滑动查看第 3、4 关的问题，并修复「玻璃大炮」「精英狂潮」「疾速虫海」在小屏下的竖排折行。
+- **三名英雄 3D 外观高辨识度重构**：[CharacterVisualFactory.ts](tiny-vanguard/src/game/scene/CharacterVisualFactory.ts) 拉开体型缩放（`1.0x` / `0.90x` / `1.24x`）、主甲色调（圣光白 / 深海靛蓝 / 熔岩赤铜）与脚底光环样式。
+- **主流手机 GPU 清晰度适配**：[qualityConfig.ts](tiny-vanguard/src/game/config/qualityConfig.ts)、[ProceduralTextures.ts](tiny-vanguard/src/game/scene/ProceduralTextures.ts) 与 [GameRuntime.ts](tiny-vanguard/src/game/core/GameRuntime.ts) 为 Adreno 7xx / Apple GPU 等旗舰移动 GPU 在高清档放开 `3.0` DPR（老旧低端移动 GPU 收敛至 `2.25`），启用 `4x` 斜视角地面/桥面各向异性过滤、阴影贴图对齐 `2048`，并支持切换画质即时刷新分辨率；Vitest 单测扩充至 **65 项**全通过。
+
+---
+
 ## 1.2.1（无尽直入与体验打磨版） — 2026-11-19
 
 在 1.2.0 养成与无尽闭环基础上，重点优化双模式无尽触达率、通道守卫英雄开局体验、QA 工具效率及极端数值容错。

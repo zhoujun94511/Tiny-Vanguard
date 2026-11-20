@@ -363,9 +363,11 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
 .stage-panel {
   width: min(820px, 100%);
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  overflow: hidden;
   background: rgba(15, 23, 42, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 22px;
@@ -489,28 +491,18 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
     padding: 6px 7px;
     gap: 6px;
   }
-  .hero-dot {
-    width: 9px;
-    height: 9px;
-  }
   .hero-name {
     font-size: 11px;
   }
   .hero-meta {
     font-size: 9px;
   }
-  .mod-strip {
-    gap: 5px;
-  }
-  .mod-chip {
-    padding: 5px 6px;
-    font-size: 10px;
-  }
 }
 .mod-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  flex-shrink: 0;
 }
 .mod-chip {
   display: flex;
@@ -524,8 +516,22 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
   color: #94a3b8;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+@media (max-width: 640px) {
+  .mod-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mod-chip {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 5px 8px;
+    font-size: 10.5px;
+  }
 }
 .mod-chip:hover {
   border-color: rgba(248, 113, 113, 0.5);
@@ -590,9 +596,17 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
 }
 .stage-card {
   position: relative;
+  flex-shrink: 0;
   overflow: hidden;
   display: grid;
   grid-template-columns: 64px 1fr auto;
@@ -756,6 +770,13 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
   .stage-panel {
     padding: 14px 14px;
     max-height: 92dvh;
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stage-list {
+    overflow-y: visible;
+    flex: 0 0 auto;
   }
   .stage-card {
     grid-template-columns: 52px 1fr;
@@ -778,6 +799,13 @@ function formatOrderNum(order: number | undefined, absIndex: number): string {
     gap: 8px;
     max-height: 94dvh;
     overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stage-list {
+    overflow-y: visible;
+    flex: 0 0 auto;
+    gap: 8px;
   }
   .panel-header {
     padding-bottom: 8px;

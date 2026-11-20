@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SoundEngine } from '../audio/SoundEngine';
-import { QUALITY_PROFILES } from '../config/qualityConfig';
+import { QUALITY_PROFILES, resolveEffectiveMaxDpr } from '../config/qualityConfig';
 import { RUNTIME_CONFIG } from '../config/runtimeConfig';
 import type {
   CharacterDefinition,
@@ -38,6 +38,7 @@ import { translateContent, translateUi } from '../i18n/i18n';
 import { InputController } from '../input/InputController';
 import { CameraController } from '../scene/CameraController';
 import { EntityRenderer } from '../scene/EntityRenderer';
+import { setTerrainTextureAnisotropy } from '../scene/ProceduralTextures';
 import { SceneArena } from '../scene/SceneArena';
 import { GameSession } from '../session/GameSession';
 import { SaveStorage } from '../session/SaveStorage';
@@ -94,6 +95,8 @@ export class GameRuntime {
   private entityRenderer: EntityRenderer | null = null;
   private cameraCtrl = new CameraController();
   private resizeObserver: ResizeObserver | null = null;
+  private gpuRendererName: string | null = null;
+  private maxHardwareAnisotropy = 1;
 
   private session: GameSession | null = null;
   private sessionSeq = 0;
@@ -484,6 +487,19 @@ export class GameRuntime {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    this.maxHardwareAnisotropy = Math.max(1, this.renderer.capabilities.getMaxAnisotropy());
+    try {
+      const gl = this.renderer.getContext();
+      const dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
+      if (dbgExt) {
+        const raw = gl.getParameter(dbgExt.UNMASKED_RENDERER_WEBGL);
+        if (typeof raw === 'string') {
+          this.gpuRendererName = raw;
+        }
+      }
+    } catch {
+      this.gpuRendererName = null;
+    }
 
     this.arena = new SceneArena();
     this.arena.initEnvironment(this.renderer);
@@ -515,8 +531,8 @@ export class GameRuntime {
     const width = Math.max(1, parent ? parent.clientWidth : window.innerWidth);
     const height = Math.max(1, parent ? parent.clientHeight : window.innerHeight);
 
-    const profile = QUALITY_PROFILES[this.saveData.settings.quality];
-    const dpr = Math.min(window.devicePixelRatio || 1, profile.maxPixelRatio);
+    const maxDpr = resolveEffectiveMaxDpr(this.saveData.settings.quality, this.gpuRendererName);
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(width, height, false);
     this.cameraCtrl.resize(width, height);
@@ -534,13 +550,18 @@ export class GameRuntime {
 
   private applyQualityProfile(tier: QualityTier): void {
     const profile = QUALITY_PROFILES[tier];
+    const desiredAniso = tier === 'high' ? 4 : tier === 'medium' ? 2 : 1;
+    setTerrainTextureAnisotropy(Math.min(desiredAniso, this.maxHardwareAnisotropy));
     if (this.session) {
       this.session.vfxScale = profile.maxVfxMultiplier;
     }
     if (this.renderer) {
       this.renderer.shadowMap.enabled = profile.shadowsEnabled;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      const dpr = Math.min(window.devicePixelRatio || 1, profile.maxPixelRatio);
+      const dpr = Math.min(
+        window.devicePixelRatio || 1,
+        resolveEffectiveMaxDpr(tier, this.gpuRendererName)
+      );
       this.renderer.setPixelRatio(dpr);
     }
     if (this.arena) {
@@ -551,6 +572,7 @@ export class GameRuntime {
         this.arena.dirLight.shadow.map = null;
       }
     }
+    this.handleResize();
   }
 
   public dispatch(cmd: GameCommand): void {

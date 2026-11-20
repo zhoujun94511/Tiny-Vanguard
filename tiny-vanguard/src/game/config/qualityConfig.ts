@@ -29,9 +29,20 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
   high: {
     tier: 'high',
     label: '高清 (高)',
-    maxPixelRatio: 2.0,
+    maxPixelRatio: 3.0,
     shadowsEnabled: true,
-    shadowMapSize: 1536,
+    shadowMapSize: 2048,
     maxVfxMultiplier: 1.0,
   },
 };
+
+const LOW_TIER_MOBILE_GPU_RE =
+  /Adreno\s*\(TM\)\s*(?:[345]\d\d|61\d)|Mali-[GT][45678]\d\b|PowerVR/i;
+
+export function resolveEffectiveMaxDpr(tier: QualityTier, gpuRendererName?: string | null): number {
+  const base = QUALITY_PROFILES[tier].maxPixelRatio;
+  if (tier === 'high' && gpuRendererName && LOW_TIER_MOBILE_GPU_RE.test(gpuRendererName)) {
+    return Math.min(base, 2.25);
+  }
+  return base;
+}

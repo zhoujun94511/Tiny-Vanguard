@@ -407,6 +407,17 @@ export function createTerrainSurfaceTexture(
 
 const terrainTextureCache = new Map<string, THREE.CanvasTexture>();
 export const SHARED_TERRAIN_TEXTURES = new Set<unknown>();
+let terrainTextureAnisotropy = 1;
+
+export function setTerrainTextureAnisotropy(anisotropy: number): void {
+  const clamped = Math.max(1, Math.min(8, Math.floor(anisotropy)));
+  if (terrainTextureAnisotropy === clamped) return;
+  terrainTextureAnisotropy = clamped;
+  for (const tex of terrainTextureCache.values()) {
+    tex.anisotropy = clamped;
+    tex.needsUpdate = true;
+  }
+}
 
 /**
  * Returns a cached procedural terrain texture so level restarts and swaps avoid
@@ -423,6 +434,7 @@ export function getCachedTerrainSurfaceTexture(
   const cached = terrainTextureCache.get(key);
   if (cached) return cached;
   const tex = createTerrainSurfaceTexture(style, baseHex, accentHex, repeatX, repeatY);
+  tex.anisotropy = terrainTextureAnisotropy;
   terrainTextureCache.set(key, tex);
   SHARED_TERRAIN_TEXTURES.add(tex);
   return tex;

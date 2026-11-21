@@ -40,7 +40,7 @@
   - 三点冷暖布光 + 轻量 Fresnel 轮廓光 + 3.5 头身战甲先锋 + 立体非卡通怪物/重甲泰坦首领 + 静态场景 `InstancedMesh` 合批。
 - **组件化动态配乐与音效（BGM + SFX）**：纯 Web Audio 程序化音乐序列器与三总线音频引擎，按主菜单 / 荒野生存 / 通道守卫 / 首领战与连杀狂热以 `82–114 BPM` 稳态变奏，支持暂停页 BGM/SFX 独立开关及主菜单快捷静音。
 - **QA 调试控制台**：3 秒内连续按两次 `F9`（或 URL `?debug=1`）可呼出中英双语 QA 调试台，支持实时遥测、`1x/2x/4x` 倍速、无敌、跳关、全战技/全 20 遗物、刷光栅与直达首领战。
-- **工业级健壮性与门禁**：代际防重入 `ObjectPool`（支持并发迭代快照）、中心螺旋扩张 `SpatialGrid`、热循环零 GC、`npm run gate` 五道构建前校验 + 63 项 Vitest 单元测试。
+- **工业级健壮性与门禁**：代际防重入 `ObjectPool`（支持并发迭代快照）、中心螺旋扩张 `SpatialGrid`、热循环零 GC 与 120Hz/144Hz 亚帧渲染插值、`npm run gate` 五道构建前校验 + 66 项 Vitest 单元测试。
 
 ## 版本沿革
 
@@ -78,7 +78,7 @@ npm run gate
 | `npm run dev` | 启动 Vite 本地开发服务器 |
 | `npm run check` | 运行 5 道构建前门禁（0 循环依赖、安全离线红线、热循环零 GC、内容配额与解耦） |
 | `npm run type-check` | 运行 `vue-tsc --noEmit` 严格类型检查 |
-| `npm test` | 运行 Vitest 63 项单元测试与无头战斗全流程模拟 |
+| `npm test` | 运行 Vitest 66 项单元测试与无头战斗全流程模拟 |
 | `npm run build:single` | 打包带版本号与时间戳的单 HTML（输出至 `dist/` 并同步到 `../docs/index.html`） |
 | `npm run verify:single` | 校验最新单 HTML 的零外链、经典脚本兼容性、隔离目录运行及体积 |
 | `npm run gate` | 串联执行 `check` → `type-check` → `test` → `build:single` → `verify:single` |

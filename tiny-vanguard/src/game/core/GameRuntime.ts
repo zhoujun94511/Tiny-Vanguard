@@ -1007,7 +1007,9 @@ export class GameRuntime {
       this.session.shockwaves,
       this.session.bridgeBarrel,
       this.session.hazardZone,
-      this.session.bridgeMeteor
+      this.session.bridgeMeteor,
+      renderX,
+      renderZ
     );
   }
 

@@ -40,7 +40,7 @@ The standalone build outputs a single self-contained HTML file under `tiny-vangu
   - Three-point warm/cool lighting + Fresnel rim shaders + 3.5-head Armored Vanguard + faceted 3D Rift Stalkers, Ravager Beasts, Void Constructs, War Golems, Shield Vanguards, and Dread Titan Bosses + `InstancedMesh` static scene batching.
 - **Dynamic Procedural Music & SFX**: Componentized Web Audio `MusicSequencer` & 3-bus `SoundEngine` that adapt themes and steady `82–114 BPM` grooves across Menu, Wild Survival, Bridge Defense, Boss encounters, and Combo Fever, with independent BGM/SFX toggles.
 - **Bilingual QA Debug Console**: Double-press `F9` within 3 seconds (or `?debug=1`) to toggle the live telemetry & QA console (`1x/2x/4x` speed, God Mode, level jump, all skills/20 relics, gate/formation triggers, Boss jump).
-- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops, `npm run gate` static/quota checks, `vue-tsc`, and 63 Vitest tests.
+- **Automated 5-Gate Verification**: Snapshot-safe `ObjectPool`, center-outward `SpatialGrid`, zero-GC hot loops & 120Hz/144Hz sub-step render interpolation, `npm run gate` static/quota checks, `vue-tsc`, and 66 Vitest tests.
 
 ## Versions
 
@@ -76,7 +76,7 @@ npm run gate
 | `npm run dev` | Start Vite dev server |
 | `npm run check` | Run 5 prebuild gates (0 circular imports, security/offline, zero-GC hot loops, content quotas) |
 | `npm run type-check` | Run `vue-tsc --noEmit` |
-| `npm test` | Run 63 Vitest unit & headless simulation tests |
+| `npm test` | Run 66 Vitest unit & headless simulation tests |
 | `npm run build:single` | Build single-file HTML (`dist/`) and sync to `../docs/index.html` |
 | `npm run verify:single` | Verify zero external links, classic script compatibility, isolated copy, and size |
 | `npm run gate` | Run `check` → `type-check` → `test` → `build:single` → `verify:single` |

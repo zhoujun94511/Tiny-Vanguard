@@ -319,7 +319,8 @@ export class GameSession {
     maxRadius: number,
     color: number,
     lifeSec = 0.42,
-    hasPillar = false
+    hasPillar = false,
+    followPlayer = false
   ): void {
     const sw = this.shockwaves.acquire();
     if (!sw) return;
@@ -332,6 +333,7 @@ export class GameSession {
     sw.lifeSec = lifeSec;
     sw.maxLifeSec = lifeSec;
     sw.hasPillar = hasPillar;
+    sw.followPlayer = followPlayer;
   }
 
   public spawnDamagePopup(

@@ -291,7 +291,7 @@ export class CombatSystem {
       }
     }
     if (hitAny) {
-      session.spawnShockwave(0, p.x, p.z, 0.4, radius, def.color, 0.36, false);
+      session.spawnShockwave(0, p.x, p.z, 0.4, radius, def.color, 0.36, false, true);
       session.spawnVfxBurst(p.x, 0.7, p.z, def.color, 6);
     }
   }
@@ -545,7 +545,7 @@ export class CombatSystem {
       this.damageEnemy(session, e, dmg, (dx / d) * 8.5, (dz / d) * 8.5, sound, true);
     }
 
-    session.spawnShockwave(0, p.x, p.z, 0.5, 4.8, 0x38bdf8, 0.38, false);
+    session.spawnShockwave(0, p.x, p.z, 0.5, 4.8, 0x38bdf8, 0.38, false, true);
     session.spawnVfxBurst(p.x, 0.9, p.z, 0x38bdf8, 12);
     sound?.playNova();
     return true;
@@ -572,8 +572,8 @@ export class CombatSystem {
       const d = Math.sqrt(dSq) || 1;
       this.damageEnemy(session, e, dmg, (dx / d) * 7, (dz / d) * 7, sound);
     }
-    session.spawnShockwave(1, p.x, p.z, 1.0, 12.8, 0xfbbf24, 0.65, true);
-    session.spawnShockwave(1, p.x, p.z, 0.6, 8.6, 0xf97316, 0.45, false);
+    session.spawnShockwave(1, p.x, p.z, 1.0, 12.8, 0xfbbf24, 0.65, true, true);
+    session.spawnShockwave(1, p.x, p.z, 0.6, 8.6, 0xf97316, 0.45, false, true);
     session.spawnVfxBurst(p.x, 1.0, p.z, 0xfbbf24, 24);
     sound?.playFury();
     return true;
@@ -848,7 +848,7 @@ export class CombatSystem {
       }
     }
 
-    session.spawnShockwave(0, p.x, p.z, 0.5, range, isEcho ? 0xa5f3fc : 0x38bdf8, 0.46, false);
+    session.spawnShockwave(0, p.x, p.z, 0.5, range, isEcho ? 0xa5f3fc : 0x38bdf8, 0.46, false, true);
     session.spawnVfxBurst(p.x, 0.65, p.z, isEcho ? 0xe0f2fe : 0x67e8f9, 12);
     if (isEcho) {
       this.echoVisualTimer = 0.34;
@@ -1420,7 +1420,7 @@ export class CombatSystem {
         this.damageEnemy(session, target, pulseDmg, 0, 0, sound, true);
       }
       this.deathEffectDepth -= 1;
-      session.spawnShockwave(1, p.x, p.z, 0.8, 9.8, 0xfde047, 0.54, true);
+      session.spawnShockwave(1, p.x, p.z, 0.8, 9.8, 0xfde047, 0.54, true, true);
       session.spawnVfxBurst(p.x, 1.0, p.z, 0xfde047, 18);
       this.enqueueNotice(
         translateUi(session.language, 'toast.centuryBlast', { combo: session.combo }),

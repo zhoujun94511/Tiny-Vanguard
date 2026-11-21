@@ -1683,7 +1683,9 @@ export class EntityRenderer {
     shockwaves?: ObjectPool<VfxShockwave>,
     bridgeBarrel?: BridgeBarrelState,
     hazardZone?: HazardZoneState,
-    bridgeMeteor?: BridgeMeteorState
+    bridgeMeteor?: BridgeMeteorState,
+    playerRenderX?: number,
+    playerRenderZ?: number
   ): void {
     let slimeCount = 0;
     let boarCount = 0;
@@ -1952,7 +1954,9 @@ export class EntityRenderer {
         if (swUsed >= this.shockwavePool.length) return;
         const slot = this.shockwavePool[swUsed];
         const progress = 1 - Math.max(0, Math.min(1, sw.lifeSec / Math.max(0.01, sw.maxLifeSec)));
-        slot.mesh.position.set(sw.x, 0.14 + swUsed * 0.004, sw.z);
+        const sx = sw.followPlayer && playerRenderX !== undefined ? playerRenderX : sw.x;
+        const sz = sw.followPlayer && playerRenderZ !== undefined ? playerRenderZ : sw.z;
+        slot.mesh.position.set(sx, 0.14 + swUsed * 0.004, sz);
         slot.mesh.scale.setScalar(sw.maxRadius);
         slot.mat.uniforms.uProgress.value = Math.max(0.04, progress);
         slot.mat.uniforms.uTime.value = simTimeSec;
@@ -1964,7 +1968,7 @@ export class EntityRenderer {
         if (sw.hasPillar && pillarUsed < this.starfallPillars.length) {
           const pSlot = this.starfallPillars[pillarUsed];
           const fade = Math.pow(1 - progress, 1.35);
-          pSlot.mesh.position.set(sw.x, 7.5, sw.z);
+          pSlot.mesh.position.set(sx, 7.5, sz);
           pSlot.mesh.scale.set(0.6 + progress * 1.4, 1, 0.6 + progress * 1.4);
           pSlot.mat.uniforms.uTime.value = simTimeSec;
           pSlot.mat.uniforms.uColor.value.setHex(sw.color);

@@ -63,9 +63,9 @@
 
 - **核心竞态红线**：
   - `window.blur` 走软暂停 `'manual'`，防止与 `hidden` 暂停栈死锁；
-  - `GameClock` 严格分离 `wallDt`（音频/FPS）与 `rawDt`（模拟），保证主菜单与升级界面 BGM 连续流畅；
+  - `GameClock` 严格分离 `wallDt`（音频/FPS）与 `rawDt`（模拟），并零 GC 输出亚帧插值因子 `alpha` 对角色 `prevX/prevZ`、动画时间与相机目标进行插值，消除 120Hz/144Hz 高刷屏移动重影；
   - `ObjectPool.forEachActive` 使用预分配 `Int32Array` 快照与代际校验，免疫循环内分裂/连锁死亡导致的增删并发错乱；
   - `SpatialGrid` 按切比雪夫中心环由内向外查询，消除西北象限截断偏置，并在敌怪移动后刷新网格；
   - `HudSnapshot` 采用 8.3Hz 双缓冲推送，避免高频逐帧刷新触发 Vue 响应式抖动。
 - **组件化动态音频**：`MusicSequencer` + 三总线 `SoundEngine`（`masterGain` / `bgmGain` / `sfxGain` + `DynamicsCompressorNode`），基于 `navigator.userActivation.hasBeenActive` 安全解锁（`click`/`touchend`/`keydown`），按菜单/生存/守卫/首领/狂热以 `82–114 BPM`、`triangle` 柔和音色与呼吸留白稳态演奏。
-- **全端适配、测试与 QA 调试台**：窄竖屏相机缩放上限 `2.15x`，监听 `resize` / `orientationchange` / `visualViewport`，补齐横屏矮视口（`max-height: 520px/540px`）与安全区样式；3 秒内双击 `F9` 呼出中英双语 QA 调试台（`DebugBridge` + `DebugPanel.vue`），并通过 59 项 Vitest 单元测试与 `npm run gate` 全链路门禁校验。
+- **全端适配、GPU 清晰度与 QA 调试台**：窄竖屏相机缩放上限 `2.15x`，监听 `resize` / `orientationchange` / `visualViewport`；旗舰移动 GPU 在高清档放开 `3.0` DPR 与 `4x` 斜视角各向异性过滤（老旧移动 GPU 收敛至 `2.25`）并对齐 `2048` 阴影贴图；3 秒内双击 `F9` 呼出中英双语 QA 调试台（`DebugBridge` + `DebugPanel.vue`），并通过 66 项 Vitest 单元测试与 `npm run gate` 全链路门禁校验。

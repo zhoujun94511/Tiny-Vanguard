@@ -127,6 +127,7 @@ export interface VfxShockwave extends PoolItem {
   lifeSec: number;
   maxLifeSec: number;
   hasPillar: boolean;
+  followPlayer: boolean;
 }
 
 export interface SupplyCrateState {
@@ -422,5 +423,6 @@ export function createEmptyShockwave(slotIndex: number): VfxShockwave {
     lifeSec: 0,
     maxLifeSec: 0.4,
     hasPillar: false,
+    followPlayer: false,
   };
 }

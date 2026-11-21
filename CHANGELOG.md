@@ -2,6 +2,12 @@
 
 本文件记录《Tiny Vanguard》对外交付版本。版本号对应 `tiny-vanguard/package.json` 的 `version`。构建文件名为 `tiny-vanguard/dist/tiny-vanguard-<版本>-<YYYYMMDD-HHmmss>.html`，每次构建只保留最新一份并同步至 `docs/index.html`，页面内的 `<meta name="version">` 与 `<meta name="build-time">` 与文件名一致。
 
+## 1.2.4（技能光环插值锚定修正版） — 2026-11-21
+
+- **移动中自身技能光环位置锚定修复**：[SessionEntities.ts](tiny-vanguard/src/game/session/SessionEntities.ts)、[GameSession.ts](tiny-vanguard/src/game/session/GameSession.ts)、[CombatSystem.ts](tiny-vanguard/src/game/systems/CombatSystem.ts)、[EntityRenderer.ts](tiny-vanguard/src/game/scene/EntityRenderer.ts) 与 [GameRuntime.ts](tiny-vanguard/src/game/core/GameRuntime.ts) 为「寒霜震荡波」「圣盾护体」「星爆大招」「守护星环脉冲」「百斩圣爆」激波增加 `followPlayer` 锚定，使光环在高速移动与亚帧插值下始终锁定主角视觉中心；Vitest 单测扩充至 **67 项**全通过。
+
+---
+
 ## 1.2.3（高刷屏亚帧插值清晰度版） — 2026-11-20
 
 - **120Hz/144Hz 高刷屏亚帧渲染插值修复**：[GameClock.ts](tiny-vanguard/src/game/core/GameClock.ts)、[SessionEntities.ts](tiny-vanguard/src/game/session/SessionEntities.ts)、[GameSession.ts](tiny-vanguard/src/game/session/GameSession.ts) 与 [GameRuntime.ts](tiny-vanguard/src/game/core/GameRuntime.ts) 引入零 GC 亚帧插值因子 `alpha` 与角色 `prevX/prevZ` 插值，消除 120Hz/144Hz 手机屏幕上移动时的隔帧重影模糊；Vitest 单测扩充至 **66 项**全通过。

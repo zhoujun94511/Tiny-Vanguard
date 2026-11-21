@@ -43,7 +43,7 @@ smoke_test:
 
 ### Phase 1: 数据驱动权威运行时与零竞态核心
 
-1. **固定步长 + 双时钟分离（`GameClock`）**：`rawDt` 驱动固定步长物理模拟，`wallDt`（不受暂停归零）驱动动态配乐与 FPS 采样，避免菜单或升级界面音乐卡死。
+1. **固定步长 + 双时钟分离 + 零 GC 亚帧渲染插值（`GameClock`）**：`rawDt` 驱动固定步长（60Hz）物理模拟，`wallDt`（不受暂停归零）驱动动态配乐与 FPS 采样；同时 `GameClock.tick()` 通过复用 `tickResult` 零 GC 输出亚帧插值因子 `alpha = accumulator / fixedStep`（`[0..1]`），在渲染期对角色 `prevX/prevZ -> x/z`、动画时间 `simTimeSec + alpha * fixedStep` 与相机目标做线性插值，彻底消除 **120Hz/144Hz 高刷手机屏下移动时的 60Hz 跳变微抖与双影拖影模糊**。
 2. **暂停栈防死锁（`GameStateMachine`）**：区分 `'manual'`、`'hidden'`、`'level-up'`、`'context-lost'`；`window.blur` 走软暂停 `'manual'`，防止可见标签页失焦后“继续战斗”死锁。
 3. **快照安全 `ObjectPool` & 中心螺旋 `SpatialGrid`**：
    - `ObjectPool.forEachActive` 使用预分配 `Int32Array` 快照 + 代际校验，免疫分裂弹生成与死亡连锁释放引发的并发遍历错乱；
@@ -58,7 +58,7 @@ smoke_test:
    - 定长池化 `BeamPool`（动态折线闪电链、穿透激光、冲刺残影）与 `ShockwavePool`（寒霜锯齿波、星爆超新星、电弧脉动）。
 3. **全静态 + 动态 `InstancedMesh` 合批与纹理缓存**：
    - 敌群、弹幕、掉落晶体、粒子、外围森林/火山塔、桥面木板/立柱/灯笼/岩岛全部走 `InstancedMesh`（整帧 `< 40 Draw Calls`）；
-   - 程序化 256×256 地形纹理通过 `getCachedTerrainSurfaceTexture` 缓存，重开关卡秒开；`webglcontextrestored` 自动重建 PMREM 与标脏纹理。
+   - 程序化 256×256 地形纹理通过 `getCachedTerrainSurfaceTexture` 缓存，按画质开启 `1x/2x/4x` 斜视角各向异性过滤（`anisotropy`），重开关卡秒开；`webglcontextrestored` 自动重建 PMREM 与标脏纹理；旗舰移动 GPU（如 Adreno 7xx / Apple GPU）在高清档放开 `3.0` DPR 并对齐 `2048` 阴影贴图，同时保护老旧低端移动 GPU 收敛至 `2.25`。
 
 ### Phase 3: 组件化动态音频（MusicSequencer + SoundEngine）
 

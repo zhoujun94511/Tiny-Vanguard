@@ -1664,4 +1664,22 @@ describe('Stage 3 Relic Enchantment & Resonance', () => {
     expect(frame2.alpha).toBeGreaterThanOrEqual(0);
     expect(frame2.alpha).toBeLessThan(0.1);
   });
+
+  it('anchors player-centered shockwaves to follow player visual position while moving', () => {
+    const regs = createDefaultRegistries();
+    const meadow = regs.levels.getOrThrow('meadow-arena');
+    const session = new GameSession(1001, meadow, regs);
+    session.spawnShockwave(0, 1, 2, 0.5, 4.5, 0x38bdf8, 0.45, false, true);
+    session.spawnShockwave(2, 5, 6, 0.2, 2.0, 0xfef08a, 0.3, false);
+
+    let followCount = 0;
+    let worldCount = 0;
+    session.shockwaves.forEachActive((sw) => {
+      if (sw.followPlayer) followCount += 1;
+      else worldCount += 1;
+    });
+    expect(followCount).toBe(1);
+    expect(worldCount).toBe(1);
+    session.dispose();
+  });
 });
